@@ -1,202 +1,524 @@
-// ==========================================
-// 1. KARTEN-INITIALISIERUNG & SETUP
-// ==========================================
-
-const startLat = parseFloat(document.getElementById('lat').value) || 47.16960;
-const startLon = parseFloat(document.getElementById('lon').value) || 16.00930;
-
-// Karte im passenden dunklen Design laden (CartoDB DarkMatter)
-const map = L.map('map', { zoomControl: true }).setView([startLat, startLon], 12);
-
-const tileLayer = L.tileLayer(
-"https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-{
-maxZoom: 19,
-attribution: "&copy; OpenStreetMap"
-}
-);
- 
-tileLayer.addTo(map);
-
-// Startmarker erzeugen (Verschiebbar)
-const startMarker = L.marker([startLat, startLon], { draggable: true }).addTo(map);
-startMarker.bindPopup("<b>Startplatz</b><br>Bewege mich, um den Ort anzupassen.").openPopup();
-
-// DOM Elemente für die Koordinatenanzeigen
-const latInput = document.getElementById('lat');
-const lonInput = document.getElementById('lon');
-const displayLat = document.getElementById('display-lat');
-const displayLon = document.getElementById('display-lon');
-
-// Automatisches Update beim Verschieben des Markers
-startMarker.on('dragend', function () {
-    const pos = startMarker.getLatLng();
-    latInput.value = pos.lat.toFixed(5);
-    lonInput.value = pos.lng.toFixed(5);
-    displayLat.textContent = pos.lat.toFixed(5);
-    displayLon.textContent = pos.lng.toFixed(5);
-});
-
-// Klick auf Karte setzt den Marker neu
-map.on('click', function(e) {
-    startMarker.setLatLng(e.latlng);
-    latInput.value = e.latlng.lat.toFixed(5);
-    lonInput.value = e.latlng.lng.toFixed(5);
-    displayLat.textContent = e.latlng.lat.toFixed(5);
-    displayLon.textContent = e.latlng.lng.toFixed(5);
-});
-
-// ==========================================
-// 2. STEUERUNGSELEMENTE & SCHNELLAUSWAHL
-// ==========================================
-
-// Flugdauer Schieberegler synchronisieren
-const durationRange = document.getElementById('duration');
-const durationVal = document.getElementById('duration-val');
-durationRange.addEventListener('input', (e) => {
-    durationVal.textContent = parseFloat(e.target.value).toFixed(1) + " Stunden";
-});
-
-// KORRIGIERT: Sicheres Vorbefüllen des heutigen Datums ohne Array-Crash
-const dateInput = document.getElementById('date');
-if (dateInput) {
-    const todayParts = new Date().toISOString().split('T');
-    dateInput.value = todayParts[0];
+:root {
+  --background: #061321;
+  --panel: rgba(7, 28, 46, 0.94);
+  --panel-light: rgba(18, 48, 74, 0.74);
+  --border: rgba(145, 194, 230, 0.2);
+  --text: #f4f8fc;
+  --muted: #a7b8c9;
+  --blue: #169df5;
+  --green: #43d17c;
+  --orange: #ffad33;
+  --red: #ff5252;
+  --violet: #b25cff;
+  --yellow: #ffd166;
+  --shadow: 0 18px 55px rgba(0, 0, 0, 0.36);
 }
 
-// Logik für Schnellauswahl-Buttons
-const checkboxes = document.querySelectorAll('#levels input[type="checkbox"]');
+* {
+  box-sizing: border-box;
+}
 
-document.getElementById('btn-all-levels').addEventListener('click', () => {
-    checkboxes.forEach(cb => cb.checked = true);
-});
+html {
+  min-height: 100%;
+}
 
-document.getElementById('btn-no-levels').addEventListener('click', () => {
-    checkboxes.forEach(cb => cb.checked = false);
-});
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(4, 15, 27, 0.18),
+      rgba(4, 15, 27, 0.86) 390px,
+      #061321 900px
+    ),
+    url("./balloon-bg.jpg") center top / cover fixed no-repeat,
+    #061321;
+  color: var(--text);
+  font-family: Inter, Arial, sans-serif;
+}
 
-document.getElementById('btn-balloon-levels').addEventListener('click', () => {
-    const balloonAltitudes = ["80", "100", "150", "180"];
-    checkboxes.forEach(cb => {
-        cb.checked = balloonAltitudes.includes(cb.value);
-    });
-});
+button,
+input {
+  font: inherit;
+}
 
-// ==========================================
-// 3. SIMULIERTE API-AUSFÜHRUNG & VISUALISIERUNG
-// ==========================================
+button {
+  cursor: pointer;
+}
 
-let mapLayers = [];
-const statusMsg = document.getElementById('status');
-const resultsDiv = document.getElementById('results');
+.hero {
+  position: relative;
+  min-height: 255px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  padding: 36px 25px 30px;
+}
 
-document.getElementById('run').addEventListener('click', () => {
-    statusMsg.textContent = "Berechne Trajektorien...";
-    statusMsg.className = "status-message";
-    statusMsg.style.color = "var(--orange)";
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(2, 14, 25, 0.94),
+    rgba(2, 14, 25, 0.43) 65%,
+    rgba(2, 14, 25, 0.15)
+  );
+}
 
-    const currentLat = parseFloat(latInput.value);
-    const currentLon = parseFloat(lonInput.value);
-    const duration = parseFloat(durationRange.value);
+.hero-content {
+  position: relative;
+  width: min(1750px, 100%);
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 30px;
+}
 
-    // Ausgewählte Höhen einsammeln
-    let selectedHeights = [];
-    document.querySelectorAll('#levels input[type="checkbox"]:checked').forEach(cb => {
-        selectedHeights.push(cb.value);
-    });
+.brand {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
 
-    if (selectedHeights.length === 0) {
-        statusMsg.textContent = "Fehler!";
-        statusMsg.style.color = "var(--red)";
-        alert("Bitte wählen Sie mindestens eine Höhe aus!");
-        return;
-    }
+.brand-icon {
+  width: 70px;
+  height: 70px;
+  display: grid;
+  flex: 0 0 70px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 2.3rem;
+  backdrop-filter: blur(12px);
+}
 
-    // Alte Layer löschen
-    mapLayers.forEach(l => map.removeLayer(l));
-    mapLayers = [];
+.eyebrow,
+.section-title small,
+.map-message small {
+  display: block;
+  margin-bottom: 5px;
+  color: #60c4ff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
 
-    setTimeout(() => {
-        statusMsg.textContent = "Berechnung abgeschlossen.";
-        statusMsg.style.color = "var(--green)";
+h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 5vw, 4.5rem);
+  line-height: 1;
+}
 
-        let tableRowsHtml = "";
-        const colors = ['var(--blue)', 'var(--green)', 'var(--orange)', 'var(--yellow)', 'var(--violet)', '#ff5252'];
+.hero-text {
+  max-width: 730px;
+  margin: 14px 0 0;
+  color: #e0ebf4;
+  line-height: 1.6;
+}
 
-        selectedHeights.forEach((height, i) => {
-            let points = [[currentLat, currentLon]];
-            let steps = duration * 2; 
-            
-            let windDriftLat = 0.012 + (i * 0.003);
-            let windDriftLon = 0.022 - (i * 0.002);
+.technology-badge {
+  border-radius: 999px;
+  background: rgba(250, 252, 255, 0.93);
+  color: #17456a;
+  padding: 11px 17px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
 
-            let cLat = currentLat;
-            let cLon = currentLon;
+.app-layout {
+  width: min(1750px, calc(100% - 28px));
+  margin: 18px auto;
+  display: grid;
+  grid-template-columns: 380px 480px minmax(500px, 1fr);
+  gap: 14px;
+  align-items: start;
+}
 
-            for(let s = 1; s <= steps; s++) {
-                cLat += windDriftLat + (Math.random() * 0.002 - 0.001);
-                cLon += windDriftLon + (Math.random() * 0.002 - 0.001);
-                points.push([cLat, cLon]);
-            }
+.sidebar,
+.results-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 
-            const lineColor = colors[i % colors.length];
+.card {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(
+    145deg,
+    rgba(15, 43, 67, 0.96),
+    rgba(6, 24, 40, 0.94)
+  );
+  box-shadow: var(--shadow);
+  padding: 19px;
+  backdrop-filter: blur(18px);
+}
 
-            // Linie auf Karte zeichnen
-            const polyline = L.polyline(points, {
-                color: lineColor,
-                weight: 4,
-                opacity: 0.8
-            }).addTo(map);
-            mapLayers.push(polyline);
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 18px;
+}
 
-            // Letzten Endpunkt markieren
-            const endPoint = points[points.length - 1];
-            const endMarker = L.circleMarker(endPoint, {
-                radius: 6,
-                fillColor: lineColor,
-                color: '#ffffff',
-                weight: 2,
-                fillOpacity: 1
-            }).addTo(map).bindPopup(`<b>Endpunkt (${height} m)</b>`);
-            mapLayers.push(endMarker);
+.section-title.compact {
+  margin-bottom: 10px;
+}
 
-            tableRowsHtml += `
-                <tr>
-                    <td><span style="display:inline-block; width:10px; height:10px; background:${lineColor}; border-radius:50%;"></span> ${height} m</td>
-                  console.log("endPoint:", endPoint);
-console.log("Typ:", typeof endPoint);
-console.log("Ist Array:", Array.isArray(endPoint));
-                    <td>${endPoint.toFixed(4)}</td>
-                    <td>${endPoint.toFixed(4)}</td>
-                </tr>
-            `;
-        });
+.section-title h2 {
+  margin: 0;
+  font-size: 1.08rem;
+}
 
-        const featureGroup = new L.featureGroup(mapLayers);
-        map.fitBounds(featureGroup.getBounds().pad(0.1));
+.step {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  flex: 0 0 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #1ba3ff, #0675df);
+  font-weight: 900;
+}
 
-        resultsDiv.innerHTML = `
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Höhe</th>
-                            <th>Lat (Ende)</th>
-                            <th>Lon (Ende)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${tableRowsHtml}
-                    </tbody>
-                </table>
-            </div>
-        `;
+label {
+  display: block;
+  color: #e0ebf5;
+  font-size: 0.79rem;
+  font-weight: 650;
+}
 
-    }, 1000);
-});
+input[type="search"],
+input[type="date"],
+input[type="time"] {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  background: rgba(4, 19, 33, 0.72);
+  color: white;
+  padding: 10px 12px;
+}
 
-// Orts-Ortssuche (Dummy-Trigger für das Suchfeld)
-document.getElementById('search-button').addEventListener('click', () => {
-    const query = document.getElementById('search-location').value;
-    alert(`Ortssuche nach "${query}" gestartet.`);
-});
+input[type="date"] {
+  color-scheme: dark;
+}
+
+input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(22, 157, 245, 0.15);
+}
+
+.search-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 7px;
+}
+
+button {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(21, 57, 85, 0.92);
+  color: white;
+  padding: 9px 12px;
+}
+
+button:hover {
+  border-color: var(--blue);
+  filter: brightness(1.12);
+}
+
+.search-row button,
+.primary-button {
+  border: 0;
+  background: linear-gradient(145deg, #1aa5ff, #0675dc);
+  font-weight: 800;
+}
+
+.search-results {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.search-result {
+  width: 100%;
+  text-align: left;
+}
+
+.search-result strong,
+.search-result span {
+  display: block;
+}
+
+.search-result span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.hint,
+.status-message,
+.level-explanation {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.location-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 12px;
+  background: rgba(3, 18, 31, 0.55);
+  padding: 13px;
+}
+
+.pin {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.coordinates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.coordinates b {
+  color: #5ec5ff;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-bottom: 18px;
+}
+
+.field-grid label {
+  margin-bottom: 7px;
+}
+
+.range-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.range-header strong {
+  color: #62c8ff;
+  font-size: 0.79rem;
+}
+
+input[type="range"] {
+  width: 100%;
+  margin-top: 10px;
+  accent-color: var(--blue);
+}
+
+.range-labels {
+  display: flex;
+  justify-content: space-between;
+  color: #8296aa;
+  font-size: 0.64rem;
+}
+
+.level-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 15px;
+}
+
+.level-group {
+  margin-top: 15px;
+}
+
+.level-group h3 {
+  margin: 0 0 9px;
+  font-size: 0.84rem;
+}
+
+.height-selector {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 7px;
+}
+
+.height-selector label {
+  position: relative;
+}
+
+.height-selector input {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.height-selector span {
+  display: grid;
+  min-height: 38px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(3, 18, 31, 0.56);
+  color: var(--muted);
+  font-size: 0.72rem;
+  transition: 150ms ease;
+  cursor: pointer;
+}
+
+.height-selector input:checked + span {
+  border-color: #28aaff;
+  background: rgba(22, 157, 245, 0.2);
+  color: white;
+  box-shadow: 0 0 0 2px rgba(22, 157, 245, 0.1);
+}
+
+.pressure-selector input:checked + span {
+  border-color: #b25cff;
+  background: rgba(178, 92, 255, 0.18);
+}
+
+.primary-button {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 18px;
+}
+
+.status-message.success {
+  color: #61e7a1;
+}
+
+.status-message.error {
+  color: #ff929e;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 17px;
+  color: var(--muted);
+}
+
+.empty-state > span {
+  font-size: 2rem;
+}
+
+.empty-state p {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.weather-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.weather-grid div {
+  border-radius: 10px;
+  background: rgba(3, 18, 31, 0.52);
+  padding: 11px;
+}
+
+.weather-grid span,
+.weather-grid strong {
+  display: block;
+}
+
+.weather-grid span {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.weather-grid strong {
+  margin-top: 4px;
+  font-size: 0.82rem;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 5px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  color: var(--muted);
+}
+
+.no-data {
+  padding: 25px 5px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.map-panel {
+  position: sticky;
+  top: 14px;
+  height: calc(100vh - 28px);
+  min-height: 760px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+  min-height: 760px;
+}
+
+.map-message,
+.map-legend {
+  position: absolute;
+  z-index: 500;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(5, 23, 39, 0.93);
+  color: white;
+  padding: 11px 13px;
+  backdrop-filter: blur(12px);
+}
+
+.map-message {
+  top: 14px;
+  left: 58px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
