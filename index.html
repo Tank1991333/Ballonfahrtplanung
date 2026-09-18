@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Interaktive Ballonfahrt-Simulation mit ICON-D2-Winddaten, Startort, Höhenauswahl und Kartenanzeige">
+  <meta name="description" content="Interaktive Ballonfahrt-Simulation mit kostenlosen ICON-D2- und GFS-Winddaten">
   <meta name="theme-color" content="#08273f">
   <title>Ballonfahrtplanung</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%88%3C/text%3E%3C/svg%3E">
@@ -20,10 +20,10 @@
         <div>
           <span class="eyebrow">Flugmeteorologie und Simulation</span>
           <h1>Ballonfahrtplanung</h1>
-          <p class="hero-text">Startort auswählen, verschiedene Höhen vergleichen und ICON-D2-Winddrift auf der Karte anzeigen.</p>
+          <p class="hero-text">Startort auswählen, verschiedene Höhen vergleichen und Winddrift auf der Karte anzeigen.</p>
         </div>
       </div>
-      <div class="technology-badge">Kostenlose ICON-D2-Daten</div>
+      <div class="technology-badge">Kostenlose Wettermodelle</div>
     </div>
   </header>
 
@@ -67,9 +67,11 @@
       <section class="card information-card">
         <span class="information-icon" aria-hidden="true">ℹ️</span>
         <div>
-          <strong>Wetterdaten</strong>
-          <p>Die Simulation verwendet kostenlose Windvorhersagen des ICON-D2-Modells über Open-Meteo. Ein API-Key ist nicht erforderlich.</p>
-          <p>Die Werte sind Modellrechnungen und keine geprüfte Flug- oder Landeprognose.</p>
+          <strong>Verwendete Wetterdaten</strong>
+          <p>Die Simulation nutzt kostenlose Open-Meteo-Winddaten ohne API-Key.</p>
+          <p>Für 10, 80, 120 und 180 m wird das hochaufgelöste <strong>ICON-D2-Modell</strong> verwendet.</p>
+          <p>Für größere Höhen werden ergänzend <strong>GFS-Druckniveaus</strong> als Näherung genutzt: 925, 850, 700 und 500 hPa.</p>
+          <p>Die Druckniveaus entsprechen nicht exakt der angegebenen Höhe über Grund. Alle Werte sind unverbindliche Modellrechnungen und keine Flug- oder Landeprognosen.</p>
         </div>
       </section>
     </aside>
@@ -77,7 +79,7 @@
     <aside class="results-column">
       <section class="card">
         <div class="section-title"><div class="step">3</div><h2>Höhen auswählen</h2></div>
-        <p class="hint">Für jede ausgewählte Höhe wird eine eigene ICON-D2-Windroute dargestellt.</p>
+        <p class="hint">Niedrige Höhen verwenden ICON-D2; größere Höhen verwenden GFS-Druckniveaus.</p>
         <div class="level-actions">
           <button id="btn-balloon-levels" type="button">Ballonhöhen</button>
           <button id="btn-all-levels" type="button">Alle</button>
@@ -93,7 +95,7 @@
       <section class="card results-card">
         <div class="section-title compact"><h2>Simulationsergebnisse</h2></div>
         <div id="results">
-          <div class="empty-state"><span aria-hidden="true">📊</span><div><strong>Keine Daten berechnet</strong><p>Klicke auf „Simulation ausführen“, um Höhe, Windrichtung, Windgeschwindigkeit und Trajektorien anzuzeigen.</p></div></div>
+          <div class="empty-state"><span aria-hidden="true">📊</span><div><strong>Keine Daten berechnet</strong><p>Klicke auf „Simulation ausführen“, um Höhe, Modell, Windrichtung, Windgeschwindigkeit und Entfernung anzuzeigen.</p></div></div>
         </div>
       </section>
     </aside>
@@ -104,13 +106,13 @@
       <div class="map-legend">
         <strong>Kartenanzeige</strong>
         <div class="legend-entry"><span class="legend-symbol legend-start"></span>Startplatz</div>
-        <div class="legend-entry"><span class="legend-symbol legend-route"></span>ICON-D2-Windroute je Höhe</div>
+        <div class="legend-entry"><span class="legend-symbol legend-route"></span>Windroute je Höhe</div>
         <div class="legend-entry"><span class="legend-symbol legend-end"></span>Simulierter Endpunkt</div>
       </div>
     </section>
   </main>
 
-  <footer class="page-footer"><p>Nur Demonstration: ICON-D2-Modellwerte und dargestellte Flugbahnen sind keine sicherheitsrelevanten Flugprognosen.</p></footer>
+  <footer class="page-footer"><p>Nur Demonstration: ICON-D2- und GFS-Modellwerte sowie dargestellte Flugbahnen sind keine sicherheitsrelevanten Flugprognosen.</p></footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="./app.js"></script>
