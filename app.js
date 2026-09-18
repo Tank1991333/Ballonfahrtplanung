@@ -8,11 +8,13 @@ const startLon = parseFloat(document.getElementById('lon').value) || 16.00930;
 // Karte im passenden dunklen Design laden (CartoDB DarkMatter)
 const map = L.map('map', { zoomControl: true }).setView([startLat, startLon], 12);
 
-L.tileLayer('https://{s}://{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap &copy; CARTO',
-    subdomains: 'abcd',
-    maxZoom: 20
-}).addTo(map);
+L.tileLayer(
+  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  {
+    maxZoom: 19,
+    attribution: '&copy; https://www.openstreetmap.org/copyrightOpenStreetMap</a>'
+  }
+).addTo(map);
 
 // Startmarker erzeugen (Verschiebbar)
 const startMarker = L.marker([startLat, startLon], { draggable: true }).addTo(map);
