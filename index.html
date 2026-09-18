@@ -1,31 +1,33 @@
-<!docty** html>
-<html lang**de">
+<!DOCTYPE html>
+<html lang="de">
 <head>
-  <meta charset="utf-**>
+  <meta charset="UTF-8">
 
   <meta
     name="viewport"
-  **content**width=device-width, initial-scale**"
+    content="width=device-width, initial-scale=1.0"
   >
 
   <meta
-    name="descript**n"
-    content="Ballonfahrtplanun**mit Wetter**dell, Flughöhen und Trajektorienk**te"
+    name="description"
+    content="Ballonfahrtplanung mit Wettermodell, Flughöhen und Trajektorienkarte"
   >
 
-  <meta name="theme-colo** content="#08273f**
+  <meta name="theme-color" content="#08273f">
 
-  <title>Ballonfahrt**anung</title>
+  <title>Ballonfahrtplanung</title>
 
-  <link
-    rel="s**lesheet"
-    href="https://unpkg.**m/leaflet@1.9.4/dist/leaflet.css"** >
-
+  <!-- 1. Leaflet CSS (KORRIGIERT: Als echtes <link>-Tag in den Head verschoben) -->
   <link
     rel="stylesheet"
-**  href="./style.css"
- **
->
+    href="https://unpkg.com"
+  >
+
+  <!-- 2. Ihr eigenes Stylesheet (KORRIGIERT: Sternchen entfernt) -->
+  <link
+    rel="stylesheet"
+    href="./style.css"
+  >
 </head>
 
 <body>
@@ -247,6 +249,7 @@
       class="map-area"
       aria-label="Trajektorienkarte"
     >
+      <!-- Karten-Container -->
       <div
         id="map"
         aria-label="Interaktive Karte"
@@ -271,9 +274,10 @@
     </section>
   </main>
 
-<script
-  src="https://unpkg.com/l**flet@1.9.4/dist/leaflet.css"/scri**>
+  <!-- 3. Die eigentliche Leaflet JavaScript-Bibliothek (KORRIGIERT & HINZUGEFÜGT) -->
+  <script src="https://unpkg.com"></script>
 
-<script src**./app.js"></script>
+  <!-- 4. Ihre eigene JavaScript-Logik (KORRIGIERT: Sternchen entfernt) -->
+  <script src="./app.js"></script>
 </body>
-</htm**
+</html>
