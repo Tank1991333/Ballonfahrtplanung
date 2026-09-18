@@ -2,22 +2,26 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Ballonfahrtplanung mit Wettermodell, Flughöhen und Trajektorienkarte">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+
+  <meta
+    name="description"
+    content="Ballonfahrtplanung mit Wettermodell, Flughöhen und Trajektorienkarte"
+  >
+
   <meta name="theme-color" content="#08273f">
 
-<title>Ballonfahrtplanung</title>
+  <title>Ballonfahrtplanung</title>
 
-  <!-- Leaflet CSS korrekt als Stylesheet, ohne integrity-Attribut -->
- <link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
-
-<link
-  rel="stylesheet"
-  href="./style.css"
-/>
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  >
 
   <!-- Eigene CSS-Datei -->
   ./style.css
@@ -40,9 +44,10 @@
   </header>
 
   <main class="app-layout">
-
-    <aside class="control-panel" aria-label="Einstellungen zur Ballonfahrt">
-
+    <aside
+      class="control-panel"
+      aria-label="Einstellungen zur Ballonfahrt"
+    >
       <div class="warning-box">
         <strong>Nur als unverbindliche Planungshilfe verwenden</strong>
 
@@ -53,11 +58,15 @@
         </p>
       </div>
 
-      <section class="form-section" aria-labelledby="startplatz-title">
+      <section
+        class="form-section"
+        aria-labelledby="startplatz-title"
+      >
         <h2 id="startplatz-title">1. Startplatz</h2>
 
         <p class="help-text">
-          Klicke auf die Karte, verschiebe den Marker oder gib Koordinaten ein.
+          Klicke auf die Karte, verschiebe den Marker oder gib
+          die Koordinaten ein.
         </p>
 
         <div class="input-grid">
@@ -101,7 +110,10 @@
         </button>
       </section>
 
-      <section class="form-section" aria-labelledby="zeit-title">
+      <section
+        class="form-section"
+        aria-labelledby="zeit-title"
+      >
         <h2 id="zeit-title">2. Startzeit und Flugdauer</h2>
 
         <label for="start">Startzeit</label>
@@ -126,7 +138,10 @@
         >
       </section>
 
-      <section class="form-section" aria-labelledby="modell-title">
+      <section
+        class="form-section"
+        aria-labelledby="modell-title"
+      >
         <h2 id="modell-title">3. Wettermodell</h2>
 
         <label for="model">Modell auswählen</label>
@@ -150,12 +165,15 @@
         </select>
       </section>
 
-      <section class="form-section" aria-labelledby="hoehen-title">
+      <section
+        class="form-section"
+        aria-labelledby="hoehen-title"
+      >
         <h2 id="hoehen-title">4. Flughöhen</h2>
 
         <p class="help-text">
-          Wähle eine bis sechs Druckhöhen. Die ungefähren Meterangaben
-          werden automatisch durch app.js eingefügt.
+          Wähle eine bis sechs Druckhöhen. Die ungefähren
+          Meterangaben werden durch app.js eingefügt.
         </p>
 
         <div
@@ -166,7 +184,10 @@
         ></div>
       </section>
 
-      <section class="form-section" aria-labelledby="berechnung-title">
+      <section
+        class="form-section"
+        aria-labelledby="berechnung-title"
+      >
         <h2 id="berechnung-title">5. Berechnung</h2>
 
         <label for="step">Berechnungsschritt</label>
@@ -207,7 +228,10 @@
         </div>
       </section>
 
-      <section class="form-section" aria-labelledby="ergebnisse-title">
+      <section
+        class="form-section"
+        aria-labelledby="ergebnisse-title"
+      >
         <h2 id="ergebnisse-title">Ergebnisse</h2>
 
         <div id="results">
@@ -216,13 +240,21 @@
           </p>
         </div>
       </section>
-
     </aside>
 
-    <section class="map-area" aria-label="Trajektorienkarte">
-      <div id="map" aria-label="Interaktive Karte"></div>
+    <section
+      class="map-area"
+      aria-label="Trajektorienkarte"
+    >
+      <div
+        id="map"
+        aria-label="Interaktive Karte"
+      ></div>
 
-      <div class="map-legend" aria-label="Kartenlegende">
+      <div
+        class="map-legend"
+        aria-label="Kartenlegende"
+      >
         <strong>Kartenanzeige</strong>
 
         <div>
@@ -236,15 +268,12 @@
         </div>
       </div>
     </section>
-
   </main>
 
-  <!-- Leaflet JavaScript korrekt als JS-Datei -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/script>
+  <!-- Leaflet JavaScript -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/script>
 
-<script src="./app.js"></script>
-
-  <!-- Eigener Anwendungscode wird nach Leaflet geladen -->
-  <script src="/app.js"></script>
+  <!-- Eigene JavaScript-Datei -->
+  <script src="./app.js"></script>
 </body>
 </html>
