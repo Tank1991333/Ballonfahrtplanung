@@ -47,7 +47,7 @@ function valueAt(data,kind,height,index){
   let lo=levels[0],hi=levels.at(-1); if(height<=lo)return Number(data[modelVar(kind,lo)][index]); if(height>=hi)return Number(data[modelVar(kind,hi)][index]);
   for(let i=0;i<levels.length-1;i++)if(height>levels[i]&&height<levels[i+1]){lo=levels[i];hi=levels[i+1];break}
   const t=(height-lo)/(hi-lo),a=Number(data[modelVar(kind,lo)][index]),b=Number(data[modelVar(kind,hi)][index]);
-  return kind==="wind_direction_10"?circularInterpolate(a,b,t):a+(b-a)*t;
+  return kind==="wind_direction"?circularInterpolate(a,b,t):a+(b-a)*t;
 }
 
 function nearestTimeIndex(times,target){let best=0,d=Infinity;times.forEach((v,i)=>{const n=Math.abs(new Date(v).getTime()-target.getTime());if(n<d){d=n;best=i}});return best}
@@ -68,7 +68,7 @@ async function runSimulation(){
   const hours=Number($("duration").value); $("run").disabled=true;setStatus("ICON-D2-Daten werden geladen …");clearRoutes();
   try{
     const data=await loadIconData(),idx=nearestTimeIndex(data.hourly.time,start),rows=[];
-    heights.forEach((h,n)=>{let lat=state.lat,lon=state.lon,path=[[lat,lon]];const steps=Math.max(1,Math.ceil(hours*4));for(let s=0;s<steps;s++){const i=Math.min(idx+Math.floor(s/4),data.hourly.time.length-1);const speed=valueAt(data.hourly,"wind_speed_10",h,i);const dir=valueAt(data.hourly,"wind_direction_10",h,i);[lat,lon]=movePoint(lat,lon,(dir+180)%360,speed*0.25);path.push([lat,lon])}const speed=valueAt(data.hourly,"wind_speed_10",h,idx),dir=valueAt(data.hourly,"wind_direction_10",h,idx);rows.push({h,speed,dir,end:[lat,lon],color:colors[n%colors.length],path});});
+    heights.forEach((h,n)=>{let lat=state.lat,lon=state.lon,path=[[lat,lon]];const steps=Math.max(1,Math.ceil(hours*4));for(let s=0;s<steps;s++){const i=Math.min(idx+Math.floor(s/4),data.hourly.time.length-1);const speed=valueAt(data.hourly,"wind_speed",h,i);const dir=valueAt(data.hourly,"wind_direction",h,i);[lat,lon]=movePoint(lat,lon,(dir+180)%360,speed*0.25);path.push([lat,lon])}const speed=valueAt(data.hourly,"wind_speed",h,idx),dir=valueAt(data.hourly,"wind_direction",h,idx);rows.push({h,speed,dir,end:[lat,lon],color:colors[n%colors.length],path});});
     renderResults(rows); drawRoutes(rows); setStatus("ICON-D2-Berechnung abgeschlossen.","success");
   }catch(e){console.error(e);setStatus(`Fehler: ${e.message}`,"error")}finally{$("run").disabled=false}
 }
