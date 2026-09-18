@@ -1,7 +1,8 @@
 "use strict";
 
-const heights = [10, 80, 120, 180];
-const colors = ["#1570a6", "#0b8b57", "#ea7d24", "#8b5cf6"];
+const heights = [10, 80, 120, 180, 300, 500, 800, 1200, 1800, 2500, 3000];
+const colors = ["#1570a6", "#0b8b57", "#ea7d24", "#8b5cf6", "#dc2626", "#0891b2", "#ca8a04", "#db2777", "#4f46e5", "#059669", "#d97706"];
+const selectedDefaults = [10, 80, 120, 180];
 
 const $ = (id) => document.getElementById(id);
 const latInput = $("lat");
@@ -26,8 +27,10 @@ const emptyResultsHtml = resultsContainer.innerHTML;
 if (typeof L === "undefined") {
   $("map").innerHTML = '<div class="map-fallback">Die Karte konnte nicht geladen werden.</div>';
   const status = $("status");
-  if (status) status.className = "status-message error";
-  if (status) status.textContent = "Leaflet wurde nicht geladen.";
+  if (status) {
+    status.className = "status-message error";
+    status.textContent = "Leaflet wurde nicht geladen.";
+  }
   throw new Error("Leaflet wurde nicht geladen.");
 }
 
@@ -88,7 +91,7 @@ function addHeightControls() {
     checkbox.type = "checkbox";
     checkbox.name = "altitude";
     checkbox.value = String(height);
-    checkbox.checked = [10, 80, 120, 180].includes(height);
+    checkbox.checked = selectedDefaults.includes(height);
 
     span.textContent = formatAltitude(height);
     label.append(checkbox, span);
@@ -319,7 +322,7 @@ searchInput.addEventListener("keydown", (event) => {
 runButton.addEventListener("click", runSimulation);
 $("btn-all-levels").addEventListener("click", () => selectHeights(heights));
 $("btn-no-levels").addEventListener("click", () => selectHeights([]));
-$("btn-balloon-levels").addEventListener("click", () => selectHeights(heights));
+$("btn-balloon-levels").addEventListener("click", () => selectHeights(selectedDefaults));
 
 addHeightControls();
 

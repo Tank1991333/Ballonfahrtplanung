@@ -1,5 +1,5 @@
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
-const ALLOWED_HEIGHTS = new Set([10, 80, 120, 180]);
+const ALLOWED_HEIGHTS = new Set([10, 80, 120, 180, 300, 500, 800, 1200, 1800, 2500, 3000]);
 const ALLOWED_STEPS = new Set([10, 15, 20, 30]);
 
 function radians(value) {
