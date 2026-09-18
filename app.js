@@ -159,6 +159,9 @@ document.getElementById('run').addEventListener('click', () => {
             tableRowsHtml += `
                 <tr>
                     <td><span style="display:inline-block; width:10px; height:10px; background:${lineColor}; border-radius:50%;"></span> ${height} m</td>
+                  console.log("endPoint:", endPoint);
+console.log("Typ:", typeof endPoint);
+console.log("Ist Array:", Array.isArray(endPoint));
                     <td>${endPoint.toFixed(4)}</td>
                     <td>${endPoint.toFixed(4)}</td>
                 </tr>
