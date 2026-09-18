@@ -8,17 +8,18 @@
   
   <title>Ballonfahrtplanung</title>
 
-  <!-- Inline-Favicon gegen den 404-Fehler auf Vercel -->
+  <!-- Inline-Favicon löst den 404-Fehler auf Vercel -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://w3.org viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎈</text></svg>">
 
-  <!-- Leaflet CSS (Mit crossorigin gegen Integritäts- und CORS-Meldungen) -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com"
+  <!-- Leaflet CSS mit EXAKTEM Subresource-Integrity Hash gegen Browser-Blockaden -->
+  <link 
+    rel="stylesheet" 
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
     crossorigin=""
   />
 
-  <!-- Einbindung des lokalen Stylesheets -->
+  <!-- Bindet Ihr lokales Stylesheet ein -->
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
@@ -29,7 +30,6 @@
     </div>
   </noscript>
 
-  <!-- Kopfzeile / Hero-Bereich -->
   <header class="hero">
     <div class="hero-overlay"></div>
     <div class="hero-content">
@@ -45,13 +45,10 @@
     </div>
   </header>
 
-  <!-- Dreispaltiges Hauptlayout laut Ihrem Grid-CSS (.app-layout) -->
   <main class="app-layout">
     
-    <!-- SPALTE 1: Startort & Fahrtdaten (.sidebar) -->
+    <!-- SPALTE 1: Startort & Fahrtdaten -->
     <aside class="sidebar">
-      
-      <!-- Sektion: Startort auswählen -->
       <section class="card">
         <div class="section-title">
           <div class="step">1</div>
@@ -76,12 +73,10 @@
             </div>
           </div>
         </div>
-        <!-- Versteckte Inputs, damit das JavaScript sauber darauf zugreifen kann -->
         <input type="hidden" id="lat" value="47.16960">
         <input type="hidden" id="lon" value="16.00930">
       </section>
 
-      <!-- Sektion: Fahrtdaten -->
       <section class="card">
         <div class="section-title">
           <div class="step">2</div>
@@ -114,10 +109,8 @@
       </section>
     </aside>
 
-    <!-- SPALTE 2: Höhenauswahl & Ergebnisse (.results-column) -->
+    <!-- SPALTE 2: Höhenauswahl & Ergebnisse -->
     <aside class="results-column">
-      
-      <!-- Sektion: Höhen auswählen -->
       <section class="card">
         <div class="section-title compact">
           <div class="step">3</div>
@@ -125,7 +118,6 @@
         </div>
         <p class="level-explanation">Du kannst mehrere Höhen gleichzeitig auswählen. Die Windwerte auf Meter-Höhen beziehen sich auf die Modellhöhe über Grund.</p>
         
-        <!-- Schnellauswahl-Tasten laut Ihrem Screenshot -->
         <div class="level-actions" style="margin-top: 10px;">
           <button type="button" id="btn-balloon-levels">Ballonhöhen</button>
           <button type="button" id="btn-all-levels">Alle</button>
@@ -133,7 +125,6 @@
         </div>
 
         <span class="eyebrow" style="margin-top: 15px;">Höhen über Grund</span>
-        <!-- Höhenwähler-Kacheln (Nutzt exakt Ihre height-selector CSS-Regeln) -->
         <div id="levels" class="height-selector">
           <label><input type="checkbox" name="altitude" value="10"><span>10 m</span></label>
           <label><input type="checkbox" name="altitude" value="30"><span>30 m</span></label>
@@ -151,7 +142,6 @@
         </div>
       </section>
 
-      <!-- Sektion: Ergebnisse -->
       <section class="card">
         <div class="section-title compact">
           <h2>Simulationsergebnisse</h2>
@@ -168,12 +158,10 @@
       </section>
     </aside>
 
-    <!-- SPALTE 3: Die interaktive Karte (.map-panel) -->
+    <!-- SPALTE 3: Die interaktive Karte -->
     <section class="map-panel">
-      <!-- Hier injiziert Leaflet die Karte hinein -->
       <div id="map"></div>
 
-      <!-- Schwebendes Overlay über der Karte -->
       <div class="map-message">
         <span class="pin" style="width:10px; height:10px; background:var(--green);"></span>
         <div>
@@ -182,7 +170,6 @@
         </div>
       </div>
 
-      <!-- Kartenlegende -->
       <div class="map-legend" style="bottom: 14px; left: 14px;">
         <span class="eyebrow">KARTENANZEIGE</span>
         <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 5px; font-size: 0.75rem;">
@@ -200,12 +187,12 @@
 
   </main>
 
-  <!-- Leaflet JavaScript (Mit crossorigin geladen) -->
+  <!-- Leaflet JavaScript mit EXAKTEM Subresource-Integrity Hash -->
   <script 
-    src="https://unpkg.com"
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
-  <!-- Ihre Logik-Datei -->
   <script src="./app.js"></script>
 </body>
 </html>
