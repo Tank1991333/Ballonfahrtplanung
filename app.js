@@ -55,10 +55,11 @@ durationRange.addEventListener('input', (e) => {
 
 // Automatisches Vorbefüllen des heutigen Datums
 const dateInput = document.getElementById('date');
-const today = new Date().toISOString().split('T')[0];
-dateInput.value = today;
+if (dateInput) {
+    dateInput.value = new Date().toISOString().split('T')[0];
+}
 
-// Logik für Schnellauswahl-Buttons (Aus Ihrem Screenshot)
+// Logik für Schnellauswahl-Buttons
 const checkboxes = document.querySelectorAll('#levels input[type="checkbox"]');
 
 document.getElementById('btn-all-levels').addEventListener('click', () => {
@@ -70,7 +71,6 @@ document.getElementById('btn-no-levels').addEventListener('click', () => {
 });
 
 document.getElementById('btn-balloon-levels').addEventListener('click', () => {
-    // Definiert typische Ballonhöhen (z.B. 80m, 100m, 150m)
     const balloonAltitudes = ["80", "100", "150", "180"];
     checkboxes.forEach(cb => {
         cb.checked = balloonAltitudes.includes(cb.value);
@@ -111,7 +111,6 @@ document.getElementById('run').addEventListener('click', () => {
     mapLayers.forEach(l => map.removeLayer(l));
     mapLayers = [];
 
-    // API Simulation (Ersetzen Sie dies später durch Ihren realen Fetch-Befehl zu Open-Meteo)
     setTimeout(() => {
         statusMsg.textContent = "Berechnung abgeschlossen.";
         statusMsg.style.color = "var(--green)";
@@ -121,9 +120,8 @@ document.getElementById('run').addEventListener('click', () => {
 
         selectedHeights.forEach((height, i) => {
             let points = [[currentLat, currentLon]];
-            let steps = duration * 2; // Datenpunkte pro halbe Stunde
+            let steps = duration * 2; 
             
-            // Simulierter Winddriftvektor abhängig von der Höhe
             let windDriftLat = 0.012 + (i * 0.003);
             let windDriftLon = 0.022 - (i * 0.002);
 
@@ -146,7 +144,7 @@ document.getElementById('run').addEventListener('click', () => {
             }).addTo(map);
             mapLayers.push(polyline);
 
-            // Letzten Endpunkt (Landung) markieren
+            // Letzten Endpunkt markieren
             const endPoint = points[points.length - 1];
             const endMarker = L.circleMarker(endPoint, {
                 radius: 6,
@@ -157,21 +155,18 @@ document.getElementById('run').addEventListener('click', () => {
             }).addTo(map).bindPopup(`<b>Endpunkt (${height} m)</b>`);
             mapLayers.push(endMarker);
 
-            // Tabellen-Datenzeile aufbauen
             tableRowsHtml += `
                 <tr>
                     <td><span style="display:inline-block; width:10px; height:10px; background:${lineColor}; border-radius:50%;"></span> ${height} m</td>
-                    <td>${endPoint[0].toFixed(4)}</td>
-                    <td>${endPoint[1].toFixed(4)}</td>
+                    <td>${endPoint.toFixed(4)}</td>
+                    <td>${endPoint.toFixed(4)}</td>
                 </tr>
             `;
         });
 
-        // Karte optimal auf Ergebnisse fokussieren
         const featureGroup = new L.featureGroup(mapLayers);
         map.fitBounds(featureGroup.getBounds().pad(0.1));
 
-        // Ergebnistabelle rendern
         resultsDiv.innerHTML = `
             <div class="table-wrapper">
                 <table>
@@ -195,5 +190,5 @@ document.getElementById('run').addEventListener('click', () => {
 // Orts-Ortssuche (Dummy-Trigger für das Suchfeld)
 document.getElementById('search-button').addEventListener('click', () => {
     const query = document.getElementById('search-location').value;
-    alert(`Ortssuche nach "${query}" gestartet.\n(Für eine Echtzeit-Suche kann hier eine Geocoding-API angebunden werden)`);
+    alert(`Ortssuche nach "${query}" gestartet.`);
 });
