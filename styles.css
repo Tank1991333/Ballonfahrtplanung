@@ -1,246 +1,524 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Ballonfahrtplanung mit Wettermodell, Flughöhen und Trajektorienkarte">
-  <meta name="theme-color" content="#08273f">
-  
-  <title>Ballonfahrtplanung</title>
+:root {
+  --background: #061321;
+  --panel: rgba(7, 28, 46, 0.94);
+  --panel-light: rgba(18, 48, 74, 0.74);
+  --border: rgba(145, 194, 230, 0.2);
+  --text: #f4f8fc;
+  --muted: #a7b8c9;
+  --blue: #169df5;
+  --green: #43d17c;
+  --orange: #ffad33;
+  --red: #ff5252;
+  --violet: #b25cff;
+  --yellow: #ffd166;
+  --shadow: 0 18px 55px rgba(0, 0, 0, 0.36);
+}
 
-  <!-- Dynamisches Ballon-Favicon gegen 404-Fehler -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://w3.org viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎈</text></svg>">
+* {
+  box-sizing: border-box;
+}
 
-  <!-- 1. Leaflet CSS (Mit crossorigin gegen Integritäts- und CORS-Meldungen) -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com"
-    crossorigin=""
-  />
+html {
+  min-height: 100%;
+}
 
-  <!-- 2. Ihr bereitgestelltes Stylesheet -->
-  <link rel="stylesheet" href="./style.css">
-</head>
-<body>
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(4, 15, 27, 0.18),
+      rgba(4, 15, 27, 0.86) 390px,
+      #061321 900px
+    ),
+    url("./balloon-bg.jpg") center top / cover fixed no-repeat,
+    #061321;
+  color: var(--text);
+  font-family: Inter, Arial, sans-serif;
+}
 
-  <noscript>
-    <div class="noscript-warning" style="background: var(--red); color: white; padding: 15px; text-align: center; font-weight: bold;">
-      Für die Ballonfahrtplanung muss JavaScript im Browser aktiviert sein.
-    </div>
-  </noscript>
+button,
+input {
+  font: inherit;
+}
 
-  <!-- Hero-Bereich (Perfekt abgestimmt auf Ihre .hero CSS-Klassen) -->
-  <header class="hero">
-    <div class="hero-overlay"></div>
-    <div class="hero-content">
-      <div class="brand">
-        <div class="brand-icon" aria-hidden="true">🎈</div>
-        <div>
-          <span class="eyebrow">FLUGMETEOROLOGIE & SIMULATION</span>
-          <h1>Ballonfahrtplanung</h1>
-          <p class="hero-text">Präzise Berechnung von Trajektorien nach Startzeit, Wettermodell und individuellen Flughöhen.</p>
-        </div>
-      </div>
-      <div class="technology-badge">
-        ICON-D2 / GFS Live-Daten
-      </div>
-    </div>
-  </header>
+button {
+  cursor: pointer;
+}
 
-  <!-- Dreispaltiges Hauptlayout laut Ihrem Grid-CSS (.app-layout) -->
-  <main class="app-layout">
-    
-    <!-- SPALTE 1: Primäre Einstellungen (.sidebar) -->
-    <aside class="sidebar">
-      
-      <!-- Warnhinweis -->
-      <div class="card">
-        <span class="eyebrow" style="color: var(--orange);">SICHERHEITSHINWEIS</span>
-        <p class="hint" style="margin-top: 5px;">
-          <strong>Nur als unverbindliche Planungshilfe verwenden.</strong> Die Berechnung ersetzt kein offizielles Flugwetterbriefing. Lufträume, NOTAMs und Hindernisse müssen separat geprüft werden.
-        </p>
-      </div>
+.hero {
+  position: relative;
+  min-height: 255px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  padding: 36px 25px 30px;
+}
 
-      <!-- Formularabschnitt 1: Startplatz -->
-      <section class="card" aria-labelledby="title-startplatz">
-        <div class="section-title">
-          <div class="step">1</div>
-          <h2 id="title-startplatz">Startplatz wählen</h2>
-        </div>
-        <p class="hint" style="margin-bottom: 12px;">Klicke auf die Karte, verschiebe den Marker oder gib die Koordinaten ein.</p>
-        
-        <div class="field-grid">
-          <div>
-            <label for="lat">Breitengrad</label>
-            <input id="lat" name="lat" type="search" value="47.28100" inputmode="decimal">
-          </div>
-          <div>
-            <label for="lon">Längengrad</label>
-            <input id="lon" name="lon" type="search" value="15.97000" inputmode="decimal">
-          </div>
-        </div>
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(2, 14, 25, 0.94),
+    rgba(2, 14, 25, 0.43) 65%,
+    rgba(2, 14, 25, 0.15)
+  );
+}
 
-        <button id="update-position" type="button" class="primary-button" style="margin-top: 0;">
-          Auf Koordinaten zentrieren
-        </button>
-      </section>
+.hero-content {
+  position: relative;
+  width: min(1750px, 100%);
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 30px;
+}
 
-      <!-- Formularabschnitt 2: Startzeit -->
-      <section class="card" aria-labelledby="title-zeit">
-        <div class="section-title">
-          <div class="step">2</div>
-          <h2 id="title-zeit">Zeit & Dauer</h2>
-        </div>
-        <div class="field-grid" style="margin-bottom: 0;">
-          <div>
-            <label for="start">Startzeit</label>
-            <input id="start" name="start" type="time">
-          </div>
-          <div>
-            <label for="date">Datum</label>
-            <input id="date" name="date" type="date">
-          </div>
-        </div>
-        <div style="margin-top: 14px;">
-          <div class="range-header">
-            <label for="duration">Flugdauer</label>
-            <strong id="duration-val">2.0 Std</strong>
-          </div>
-          <input id="duration" name="duration" type="range" min="0.5" max="12" step="0.5" value="2">
-          <div class="range-labels">
-            <span>0.5h</span>
-            <span>6h</span>
-            <span>12h</span>
-          </div>
-        </div>
-      </section>
-    </aside>
+.brand {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
 
-    <!-- SPALTE 2: Meteorologie & Steuerung (.results-column) -->
-    <aside class="results-column">
-      
-      <!-- Formularabschnitt 3 & 4: Wettermodell & Flughöhen -->
-      <section class="card">
-        <div class="section-title compact">
-          <div class="step">3</div>
-          <h2>Wettermodell & Auflösung</h2>
-        </div>
-        
-        <!-- Trick zur Nutzung Ihrer input[type="search"] Formatierung für ein sauberes Feld -->
-        <input id="model-display" type="search" list="models" value="ICON-D2, Österreich und Umgebung" placeholder="Modell wählen...">
-        <datalist id="models">
-          <option value="ICON-D2, Österreich und Umgebung">
-          <option value="ICON-EU">
-          <option value="ICON Global">
-          <option value="GFS Global">
-        </datalist>
+.brand-icon {
+  width: 70px;
+  height: 70px;
+  display: grid;
+  flex: 0 0 70px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 2.3rem;
+  backdrop-filter: blur(12px);
+}
 
-        <div class="level-group">
-          <span class="eyebrow">FLUGHÖHEN WÄHLEN</span>
-          <p class="level-explanation">Wähle eine bis sechs Druckhöhen (hPa / ft).</p>
-          
-          <!-- Höhenwähler basierend auf Ihren .height-selector Klassen -->
-          <div id="levels" class="height-selector">
-            <label>
-              <input type="checkbox" name="altitude" value="950">
-              <span>950 hPa</span>
-            </label>
-            <label>
-              <input type="checkbox" name="altitude" value="850" checked>
-              <span>850 hPa</span>
-            </label>
-            <label>
-              <input type="checkbox" name="altitude" value="700">
-              <span>700 hPa</span>
-            </label>
-            <label>
-              <input type="checkbox" name="altitude" value="500">
-              <span>500 hPa</span>
-            </label>
-          </div>
-        </div>
-      </section>
+.eyebrow,
+.section-title small,
+.map-message small {
+  display: block;
+  margin-bottom: 5px;
+  color: #60c4ff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
 
-      <!-- Formularabschnitt 5: Berechnung & Live-Status -->
-      <section class="card">
-        <div class="section-title">
-          <div class="step">4</div>
-          <h2>Berechnung ausführen</h2>
-        </div>
-        
-        <div class="weather-grid">
-          <div>
-            <span>Intervall</span>
-            <strong>30 Min.</strong>
-          </div>
-          <div>
-            <span>Status</span>
-            <strong id="status" class="status-message success">Bereit</strong>
-          </div>
-        </div>
+h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 5vw, 4.5rem);
+  line-height: 1;
+}
 
-        <button id="run" type="button" class="primary-button">
-          Trajektorien berechnen
-        </button>
-      </section>
+.hero-text {
+  max-width: 730px;
+  margin: 14px 0 0;
+  color: #e0ebf4;
+  line-height: 1.6;
+}
 
-      <!-- Ergebnisse -->
-      <section class="card" aria-labelledby="title-ergebnisse">
-        <div class="section-title compact">
-          <h2 id="title-ergebnisse">Simulationsergebnisse</h2>
-        </div>
-        <div id="results">
-          <div class="empty-state">
-            <span>📊</span>
-            <div>
-              <strong>Keine Daten verfügbar</strong>
-              <p>Starte die Berechnung, um die Trajektorietabelle zu füllen.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-    </aside>
+.technology-badge {
+  border-radius: 999px;
+  background: rgba(250, 252, 255, 0.93);
+  color: #17456a;
+  padding: 11px 17px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
 
-    <!-- SPALTE 3: Die interaktive Karte (.map-panel) -->
-    <section class="map-panel" aria-label="Trajektorienkarte">
-      
-      <!-- Der Karten-Container erhält via CSS 100% Höhe & min-height: 760px -->
-      <div id="map"></div>
+.app-layout {
+  width: min(1750px, calc(100% - 28px));
+  margin: 18px auto;
+  display: grid;
+  grid-template-columns: 380px 480px minmax(500px, 1fr);
+  gap: 14px;
+  align-items: start;
+}
 
-      <!-- Schwebende Statusmeldung über der Karte -->
-      <div class="map-message">
-        <span class="pin" style="width:10px; height:10px; background:var(--green);"></span>
-        <div>
-          <span class="eyebrow" style="margin:0;">SYSTEM-STATUS</span>
-          <small style="color:white; font-weight:normal; letter-spacing:normal;">Kartenlayer erfolgreich geladen</small>
-        </div>
-      </div>
+.sidebar,
+.results-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 
-      <!-- Schwebende Kartenlegende -->
-      <div class="map-legend" style="bottom: 14px; left: 14px;">
-        <span class="eyebrow">LEGENDE</span>
-        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 5px; font-size: 0.75rem;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="width: 12px; height: 12px; background: var(--blue); border-radius: 50%; display: inline-block;"></span>
-            Startplatz
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="width: 12px; height: 12px; background: var(--orange); border-radius: 2px; display: inline-block;"></span>
-            Trajektorie
-          </div>
-        </div>
-      </div>
-    </section>
+.card {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(
+    145deg,
+    rgba(15, 43, 67, 0.96),
+    rgba(6, 24, 40, 0.94)
+  );
+  box-shadow: var(--shadow);
+  padding: 19px;
+  backdrop-filter: blur(18px);
+}
 
-  </main>
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 18px;
+}
 
-  <!-- 3. Leaflet JavaScript (Mit crossorigin geladen vor Ihrer app.js) -->
-  <script 
-    src="https://unpkg.com"
-    crossorigin=""
-  ></script>
+.section-title.compact {
+  margin-bottom: 10px;
+}
 
-  <!-- 4. Ihre eigene JavaScript-Anwendungslogik -->
-  <script src="./app.js"></script>
-</body>
-</html>
+.section-title h2 {
+  margin: 0;
+  font-size: 1.08rem;
+}
+
+.step {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  flex: 0 0 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #1ba3ff, #0675df);
+  font-weight: 900;
+}
+
+label {
+  display: block;
+  color: #e0ebf5;
+  font-size: 0.79rem;
+  font-weight: 650;
+}
+
+input[type="search"],
+input[type="date"],
+input[type="time"] {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  background: rgba(4, 19, 33, 0.72);
+  color: white;
+  padding: 10px 12px;
+}
+
+input[type="date"] {
+  color-scheme: dark;
+}
+
+input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(22, 157, 245, 0.15);
+}
+
+.search-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 7px;
+}
+
+button {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(21, 57, 85, 0.92);
+  color: white;
+  padding: 9px 12px;
+}
+
+button:hover {
+  border-color: var(--blue);
+  filter: brightness(1.12);
+}
+
+.search-row button,
+.primary-button {
+  border: 0;
+  background: linear-gradient(145deg, #1aa5ff, #0675dc);
+  font-weight: 800;
+}
+
+.search-results {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.search-result {
+  width: 100%;
+  text-align: left;
+}
+
+.search-result strong,
+.search-result span {
+  display: block;
+}
+
+.search-result span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.hint,
+.status-message,
+.level-explanation {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.location-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 12px;
+  background: rgba(3, 18, 31, 0.55);
+  padding: 13px;
+}
+
+.pin {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.coordinates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.coordinates b {
+  color: #5ec5ff;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-bottom: 18px;
+}
+
+.field-grid label {
+  margin-bottom: 7px;
+}
+
+.range-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.range-header strong {
+  color: #62c8ff;
+  font-size: 0.79rem;
+}
+
+input[type="range"] {
+  width: 100%;
+  margin-top: 10px;
+  accent-color: var(--blue);
+}
+
+.range-labels {
+  display: flex;
+  justify-content: space-between;
+  color: #8296aa;
+  font-size: 0.64rem;
+}
+
+.level-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 15px;
+}
+
+.level-group {
+  margin-top: 15px;
+}
+
+.level-group h3 {
+  margin: 0 0 9px;
+  font-size: 0.84rem;
+}
+
+.height-selector {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 7px;
+}
+
+.height-selector label {
+  position: relative;
+}
+
+.height-selector input {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.height-selector span {
+  display: grid;
+  min-height: 38px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(3, 18, 31, 0.56);
+  color: var(--muted);
+  font-size: 0.72rem;
+  transition: 150ms ease;
+  cursor: pointer;
+}
+
+.height-selector input:checked + span {
+  border-color: #28aaff;
+  background: rgba(22, 157, 245, 0.2);
+  color: white;
+  box-shadow: 0 0 0 2px rgba(22, 157, 245, 0.1);
+}
+
+.pressure-selector input:checked + span {
+  border-color: #b25cff;
+  background: rgba(178, 92, 255, 0.18);
+}
+
+.primary-button {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 18px;
+}
+
+.status-message.success {
+  color: #61e7a1;
+}
+
+.status-message.error {
+  color: #ff929e;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 17px;
+  color: var(--muted);
+}
+
+.empty-state > span {
+  font-size: 2rem;
+}
+
+.empty-state p {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.weather-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.weather-grid div {
+  border-radius: 10px;
+  background: rgba(3, 18, 31, 0.52);
+  padding: 11px;
+}
+
+.weather-grid span,
+.weather-grid strong {
+  display: block;
+}
+
+.weather-grid span {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.weather-grid strong {
+  margin-top: 4px;
+  font-size: 0.82rem;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 5px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  color: var(--muted);
+}
+
+.no-data {
+  padding: 25px 5px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.map-panel {
+  position: sticky;
+  top: 14px;
+  height: calc(100vh - 28px);
+  min-height: 760px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+  min-height: 760px;
+}
+
+.map-message,
+.map-legend {
+  position: absolute;
+  z-index: 500;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(5, 23, 39, 0.93);
+  color: white;
+  padding: 11px 13px;
+  backdrop-filter: blur(12px);
+}
+
+.map-message {
+  top: 14px;
+  left: 58px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
