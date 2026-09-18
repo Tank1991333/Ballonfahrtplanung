@@ -17,13 +17,17 @@
 
   <title>Ballonfahrtplanung</title>
 
-  <!-- 1. Leaflet CSS (KORRIGIERT: Als echtes <link>-Tag in den Head verschoben) -->
+  <!-- Inline-Favicon gegen den 404-Fehler auf Vercel -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://w3.org viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎈</text></svg>">
+
+  <!-- 1. Leaflet CSS (Mit crossorigin-Attribut gegen CORS-Warnungen) -->
   <link
     rel="stylesheet"
     href="https://unpkg.com"
+    crossorigin=""
   >
 
-  <!-- 2. Ihr eigenes Stylesheet (KORRIGIERT: Sternchen entfernt) -->
+  <!-- 2. Ihr eigenes Stylesheet -->
   <link
     rel="stylesheet"
     href="./style.css"
@@ -274,10 +278,13 @@
     </section>
   </main>
 
-  <!-- 3. Die eigentliche Leaflet JavaScript-Bibliothek (KORRIGIERT & HINZUGEFÜGT) -->
-  <script src="https://unpkg.com"></script>
+  <!-- 3. Leaflet JavaScript (Mit crossorigin-Attribut) -->
+  <script 
+    src="https://unpkg.com"
+    crossorigin=""
+  ></script>
 
-  <!-- 4. Ihre eigene JavaScript-Logik (KORRIGIERT: Sternchen entfernt) -->
+  <!-- 4. Ihre eigene JavaScript-Logik -->
   <script src="./app.js"></script>
 </body>
 </html>
