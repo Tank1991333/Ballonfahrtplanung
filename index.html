@@ -6,16 +6,21 @@
   <meta name="description" content="Ballonfahrtplanung mit Wettermodell, Flughöhen und Trajektorienkarte">
   <meta name="theme-color" content="#08273f">
 
-  <title>Windy Ballonfahrtplanung</title>
+<title>Ballonfahrtplanung</title>
 
   <!-- Leaflet CSS korrekt als Stylesheet, ohne integrity-Attribut -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  >
+ <link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+
+<link
+  rel="stylesheet"
+  href="./style.css"
+/>
 
   <!-- Eigene CSS-Datei -->
-  /style.css
+  ./style.css
 </head>
 
 <body>
@@ -29,7 +34,7 @@
     <div class="header-icon" aria-hidden="true">🎈</div>
 
     <div>
-      <h1>Windy Ballonfahrtplanung</h1>
+      <h1>Ballonfahrtplanung</h1>
       <p>Trajektorien nach Startzeit, Wettermodell und Flughöhe</p>
     </div>
   </header>
@@ -235,7 +240,9 @@
   </main>
 
   <!-- Leaflet JavaScript korrekt als JS-Datei -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/script>
+
+<script src="./app.js"></script>
 
   <!-- Eigener Anwendungscode wird nach Leaflet geladen -->
   <script src="/app.js"></script>
