@@ -1,524 +1,434 @@
-:root {
-  --background: #061321;
-  --panel: rgba(7, 28, 46, 0.94);
-  --panel-light: rgba(18, 48, 74, 0.74);
-  --border: rgba(145, 194, 230, 0.2);
-  --text: #f4f8fc;
-  --muted: #a7b8c9;
-  --blue: #169df5;
-  --green: #43d17c;
-  --orange: #ffad33;
-  --red: #ff5252;
-  --violet: #b25cff;
-  --yellow: #ffd166;
-  --shadow: 0 18px 55px rgba(0, 0, 0, 0.36);
+"use strict";
+
+// ==========================================
+// 1. DOM-ELEMENTE UND STARTWERTE
+// ==========================================
+
+const latInput = document.getElementById("lat");
+const lonInput = document.getElementById("lon");
+const displayLat = document.getElementById("display-lat");
+const displayLon = document.getElementById("display-lon");
+const currentLocationName = document.getElementById("current-location-name");
+
+const durationRange = document.getElementById("duration");
+const durationVal = document.getElementById("duration-val");
+const dateInput = document.getElementById("date");
+
+const statusMsg = document.getElementById("status");
+const resultsDiv = document.getElementById("results");
+
+const startLat = parseFloat(latInput.value) || 47.1696;
+const startLon = parseFloat(lonInput.value) || 16.0093;
+
+// ==========================================
+// 2. KARTEN-INITIALISIERUNG
+// ==========================================
+
+const map = L.map("map", {
+  zoomControl: true
+}).setView([startLat, startLon], 12);
+
+const tileLayer = L.tileLayer(
+  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap"
+  }
+);
+
+tileLayer.addTo(map);
+
+const startMarker = L.marker(
+  [startLat, startLon],
+  {
+    draggable: true
+  }
+).addTo(map);
+
+startMarker
+  .bindPopup(
+    "<b>Startplatz</b><br>Marker verschieben oder auf die Karte klicken."
+  )
+  .openPopup();
+
+// Enthält später alle erzeugten Linien und Endmarker.
+let mapLayers = [];
+
+// Nach dem Laden sicherstellen, dass Leaflet die Kartengröße richtig erkennt.
+window.addEventListener("load", function () {
+  window.setTimeout(function () {
+    map.invalidateSize();
+  }, 100);
+});
+
+// ==========================================
+// 3. KOORDINATEN AKTUALISIEREN
+// ==========================================
+
+function updateCoordinates(lat, lon, locationName) {
+  latInput.value = lat.toFixed(5);
+  lonInput.value = lon.toFixed(5);
+
+  displayLat.textContent = lat.toFixed(5);
+  displayLon.textContent = lon.toFixed(5);
+
+  if (locationName) {
+    currentLocationName.textContent = locationName;
+  }
 }
 
-* {
-  box-sizing: border-box;
-}
+startMarker.on("dragend", function () {
+  const position = startMarker.getLatLng();
 
-html {
-  min-height: 100%;
-}
-
-body {
-  min-height: 100vh;
-  margin: 0;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(4, 15, 27, 0.18),
-      rgba(4, 15, 27, 0.86) 390px,
-      #061321 900px
-    ),
-    url("./balloon-bg.jpg") center top / cover fixed no-repeat,
-    #061321;
-  color: var(--text);
-  font-family: Inter, Arial, sans-serif;
-}
-
-button,
-input {
-  font: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-.hero {
-  position: relative;
-  min-height: 255px;
-  display: flex;
-  align-items: flex-end;
-  overflow: hidden;
-  padding: 36px 25px 30px;
-}
-
-.hero-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    rgba(2, 14, 25, 0.94),
-    rgba(2, 14, 25, 0.43) 65%,
-    rgba(2, 14, 25, 0.15)
+  updateCoordinates(
+    position.lat,
+    position.lng,
+    "Manuell gewählter Startpunkt"
   );
-}
+});
 
-.hero-content {
-  position: relative;
-  width: min(1750px, 100%);
-  margin: 0 auto;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 30px;
-}
+map.on("click", function (event) {
+  startMarker.setLatLng(event.latlng);
 
-.brand {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-}
-
-.brand-icon {
-  width: 70px;
-  height: 70px;
-  display: grid;
-  flex: 0 0 70px;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.14);
-  font-size: 2.3rem;
-  backdrop-filter: blur(12px);
-}
-
-.eyebrow,
-.section-title small,
-.map-message small {
-  display: block;
-  margin-bottom: 5px;
-  color: #60c4ff;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-}
-
-h1 {
-  margin: 0;
-  font-size: clamp(2.2rem, 5vw, 4.5rem);
-  line-height: 1;
-}
-
-.hero-text {
-  max-width: 730px;
-  margin: 14px 0 0;
-  color: #e0ebf4;
-  line-height: 1.6;
-}
-
-.technology-badge {
-  border-radius: 999px;
-  background: rgba(250, 252, 255, 0.93);
-  color: #17456a;
-  padding: 11px 17px;
-  font-size: 0.8rem;
-  font-weight: 800;
-}
-
-.app-layout {
-  width: min(1750px, calc(100% - 28px));
-  margin: 18px auto;
-  display: grid;
-  grid-template-columns: 380px 480px minmax(500px, 1fr);
-  gap: 14px;
-  align-items: start;
-}
-
-.sidebar,
-.results-column {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.card {
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: linear-gradient(
-    145deg,
-    rgba(15, 43, 67, 0.96),
-    rgba(6, 24, 40, 0.94)
+  updateCoordinates(
+    event.latlng.lat,
+    event.latlng.lng,
+    "Manuell gewählter Startpunkt"
   );
-  box-shadow: var(--shadow);
-  padding: 19px;
-  backdrop-filter: blur(18px);
+});
+
+// ==========================================
+// 4. DATUM UND FLUGDAUER
+// ==========================================
+
+function getLocalDateString() {
+  const now = new Date();
+  const timezoneOffset = now.getTimezoneOffset() * 60000;
+
+  return new Date(now.getTime() - timezoneOffset)
+    .toISOString()
+    .split("T")[0];
 }
 
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  margin-bottom: 18px;
+dateInput.value = getLocalDateString();
+
+durationRange.addEventListener("input", function (event) {
+  const duration = parseFloat(event.target.value);
+  durationVal.textContent = duration.toFixed(1) + " Stunden";
+});
+
+// ==========================================
+// 5. HÖHENAUSWAHL
+// ==========================================
+
+const checkboxes = document.querySelectorAll(
+  '#levels input[type="checkbox"]'
+);
+
+document
+  .getElementById("btn-all-levels")
+  .addEventListener("click", function () {
+    checkboxes.forEach(function (checkbox) {
+      checkbox.checked = true;
+    });
+  });
+
+document
+  .getElementById("btn-no-levels")
+  .addEventListener("click", function () {
+    checkboxes.forEach(function (checkbox) {
+      checkbox.checked = false;
+    });
+  });
+
+document
+  .getElementById("btn-balloon-levels")
+  .addEventListener("click", function () {
+    const balloonAltitudes = ["80", "100", "150", "180"];
+
+    checkboxes.forEach(function (checkbox) {
+      checkbox.checked = balloonAltitudes.includes(checkbox.value);
+    });
+  });
+
+// ==========================================
+// 6. ORTSSUCHE
+// ==========================================
+
+const searchInput = document.getElementById("search-location");
+const searchButton = document.getElementById("search-button");
+
+async function searchLocation() {
+  const query = searchInput.value.trim();
+
+  if (!query) {
+    alert("Bitte gib einen Ort oder eine Postleitzahl ein.");
+    searchInput.focus();
+    return;
+  }
+
+  const originalButtonText = searchButton.textContent;
+
+  searchButton.disabled = true;
+  searchButton.textContent = "Suche...";
+
+  try {
+    const url =
+      "https://nominatim.openstreetmap.org/search" +
+      "?format=jsonv2" +
+      "&limit=1" +
+      "&countrycodes=at" +
+      "&q=" +
+      encodeURIComponent(query);
+
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error("Die Ortssuche konnte nicht geladen werden.");
+    }
+
+    const data = await response.json();
+
+    if (!Array.isArray(data) || data.length === 0) {
+      alert("Der eingegebene Ort wurde in Österreich nicht gefunden.");
+      return;
+    }
+
+    const result = data[0];
+    const latitude = parseFloat(result.lat);
+    const longitude = parseFloat(result.lon);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      throw new Error("Die gefundenen Koordinaten sind ungültig.");
+    }
+
+    startMarker.setLatLng([latitude, longitude]);
+    map.setView([latitude, longitude], 13);
+
+    updateCoordinates(
+      latitude,
+      longitude,
+      result.display_name || query
+    );
+
+    startMarker
+      .bindPopup(
+        "<b>Startplatz</b><br>" +
+        escapeHtml(result.display_name || query)
+      )
+      .openPopup();
+  } catch (error) {
+    console.error("Fehler bei der Ortssuche:", error);
+
+    alert(
+      "Die Ortssuche ist derzeit nicht verfügbar. " +
+      "Du kannst den Startpunkt direkt auf der Karte auswählen."
+    );
+  } finally {
+    searchButton.disabled = false;
+    searchButton.textContent = originalButtonText;
+  }
 }
 
-.section-title.compact {
-  margin-bottom: 10px;
+searchButton.addEventListener("click", searchLocation);
+
+searchInput.addEventListener("keydown", function (event) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    searchLocation();
+  }
+});
+
+// ==========================================
+// 7. TRAJEKTORIEN-SIMULATION
+// ==========================================
+
+document.getElementById("run").addEventListener("click", function () {
+  statusMsg.textContent = "Berechne Trajektorien...";
+  statusMsg.className = "status-message loading";
+
+  const currentLat = parseFloat(latInput.value);
+  const currentLon = parseFloat(lonInput.value);
+  const duration = parseFloat(durationRange.value);
+
+  const selectedHeights = Array.from(
+    document.querySelectorAll(
+      '#levels input[type="checkbox"]:checked'
+    )
+  ).map(function (checkbox) {
+    return checkbox.value;
+  });
+
+  if (!Number.isFinite(currentLat) || !Number.isFinite(currentLon)) {
+    setStatus(
+      "Die Koordinaten sind ungültig.",
+      "error"
+    );
+    return;
+  }
+
+  if (!Number.isFinite(duration) || duration <= 0) {
+    setStatus(
+      "Die Flugdauer ist ungültig.",
+      "error"
+    );
+    return;
+  }
+
+  if (selectedHeights.length === 0) {
+    setStatus(
+      "Bitte mindestens eine Höhe auswählen.",
+      "error"
+    );
+
+    alert("Bitte wählen Sie mindestens eine Höhe aus.");
+    return;
+  }
+
+  clearSimulationLayers();
+
+  window.setTimeout(function () {
+    let tableRowsHtml = "";
+
+    const colors = [
+      "#169df5",
+      "#43d17c",
+      "#ffad33",
+      "#ffd166",
+      "#b25cff",
+      "#ff5252",
+      "#00d4c7",
+      "#ff7eb6"
+    ];
+
+    selectedHeights.forEach(function (height, index) {
+      const points = [[currentLat, currentLon]];
+
+      // Zwei Wegpunkte pro Stunde, mindestens ein Schritt.
+      const steps = Math.max(1, Math.round(duration * 2));
+
+      // Unterschiedliche Modellbewegung je ausgewählter Höhe.
+      const windDriftLat = 0.012 + index * 0.003;
+      const windDriftLon = 0.022 - index * 0.002;
+
+      let calculatedLat = currentLat;
+      let calculatedLon = currentLon;
+
+      for (let step = 1; step <= steps; step += 1) {
+        calculatedLat +=
+          windDriftLat +
+          (Math.random() * 0.002 - 0.001);
+
+        calculatedLon +=
+          windDriftLon +
+          (Math.random() * 0.002 - 0.001);
+
+        points.push([calculatedLat, calculatedLon]);
+      }
+
+      const lineColor = colors[index % colors.length];
+
+      const polyline = L.polyline(points, {
+        color: lineColor,
+        weight: 4,
+        opacity: 0.82
+      }).addTo(map);
+
+      mapLayers.push(polyline);
+
+      const endPoint = points[points.length - 1];
+
+      const endMarker = L.circleMarker(endPoint, {
+        radius: 6,
+        fillColor: lineColor,
+        color: "#ffffff",
+        weight: 2,
+        fillOpacity: 1
+      })
+        .addTo(map)
+        .bindPopup(
+          "<b>Simulierter Endpunkt</b><br>" +
+          escapeHtml(height) +
+          " m über Grund"
+        );
+
+      mapLayers.push(endMarker);
+
+      tableRowsHtml += `
+        <tr>
+          <td>
+            <span
+              class="result-color"
+              style="background:${lineColor};"
+            ></span>
+            ${escapeHtml(height)} m
+          </td>
+          <td>${endPoint[0].toFixed(4)}</td>
+          <td>${endPoint[1].toFixed(4)}</td>
+        </tr>
+      `;
+    });
+
+    if (mapLayers.length > 0) {
+      const featureGroup = L.featureGroup(mapLayers);
+      const bounds = featureGroup.getBounds();
+
+      if (bounds.isValid()) {
+        map.fitBounds(bounds.pad(0.1));
+      }
+    }
+
+    resultsDiv.innerHTML = `
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Höhe</th>
+              <th>Lat. Ende</th>
+              <th>Lon. Ende</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${tableRowsHtml}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    setStatus(
+      "Simulation abgeschlossen.",
+      "success"
+    );
+  }, 600);
+});
+
+// ==========================================
+// 8. HILFSFUNKTIONEN
+// ==========================================
+
+function clearSimulationLayers() {
+  mapLayers.forEach(function (layer) {
+    map.removeLayer(layer);
+  });
+
+  mapLayers = [];
 }
 
-.section-title h2 {
-  margin: 0;
-  font-size: 1.08rem;
+function setStatus(message, type) {
+  statusMsg.textContent = message;
+  statusMsg.className = "status-message " + type;
 }
 
-.step {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  flex: 0 0 34px;
-  place-items: center;
-  border-radius: 50%;
-  background: linear-gradient(145deg, #1ba3ff, #0675df);
-  font-weight: 900;
-}
-
-label {
-  display: block;
-  color: #e0ebf5;
-  font-size: 0.79rem;
-  font-weight: 650;
-}
-
-input[type="search"],
-input[type="date"],
-input[type="time"] {
-  width: 100%;
-  min-height: 44px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  outline: none;
-  background: rgba(4, 19, 33, 0.72);
-  color: white;
-  padding: 10px 12px;
-}
-
-input[type="date"] {
-  color-scheme: dark;
-}
-
-input:focus {
-  border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(22, 157, 245, 0.15);
-}
-
-.search-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-  margin-top: 7px;
-}
-
-button {
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: rgba(21, 57, 85, 0.92);
-  color: white;
-  padding: 9px 12px;
-}
-
-button:hover {
-  border-color: var(--blue);
-  filter: brightness(1.12);
-}
-
-.search-row button,
-.primary-button {
-  border: 0;
-  background: linear-gradient(145deg, #1aa5ff, #0675dc);
-  font-weight: 800;
-}
-
-.search-results {
-  display: grid;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.search-result {
-  width: 100%;
-  text-align: left;
-}
-
-.search-result strong,
-.search-result span {
-  display: block;
-}
-
-.search-result span {
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: 0.72rem;
-}
-
-.hint,
-.status-message,
-.level-explanation {
-  color: var(--muted);
-  font-size: 0.75rem;
-  line-height: 1.5;
-}
-
-.location-box {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border-radius: 12px;
-  background: rgba(3, 18, 31, 0.55);
-  padding: 13px;
-}
-
-.pin {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--blue);
-}
-
-.coordinates {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px 12px;
-  margin-top: 5px;
-  color: var(--muted);
-  font-size: 0.68rem;
-}
-
-.coordinates b {
-  color: #5ec5ff;
-}
-
-.field-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 9px;
-  margin-bottom: 18px;
-}
-
-.field-grid label {
-  margin-bottom: 7px;
-}
-
-.range-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.range-header strong {
-  color: #62c8ff;
-  font-size: 0.79rem;
-}
-
-input[type="range"] {
-  width: 100%;
-  margin-top: 10px;
-  accent-color: var(--blue);
-}
-
-.range-labels {
-  display: flex;
-  justify-content: space-between;
-  color: #8296aa;
-  font-size: 0.64rem;
-}
-
-.level-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
-  margin-bottom: 15px;
-}
-
-.level-group {
-  margin-top: 15px;
-}
-
-.level-group h3 {
-  margin: 0 0 9px;
-  font-size: 0.84rem;
-}
-
-.height-selector {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 7px;
-}
-
-.height-selector label {
-  position: relative;
-}
-
-.height-selector input {
-  position: absolute;
-  pointer-events: none;
-  opacity: 0;
-}
-
-.height-selector span {
-  display: grid;
-  min-height: 38px;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: rgba(3, 18, 31, 0.56);
-  color: var(--muted);
-  font-size: 0.72rem;
-  transition: 150ms ease;
-  cursor: pointer;
-}
-
-.height-selector input:checked + span {
-  border-color: #28aaff;
-  background: rgba(22, 157, 245, 0.2);
-  color: white;
-  box-shadow: 0 0 0 2px rgba(22, 157, 245, 0.1);
-}
-
-.pressure-selector input:checked + span {
-  border-color: #b25cff;
-  background: rgba(178, 92, 255, 0.18);
-}
-
-.primary-button {
-  width: 100%;
-  min-height: 48px;
-  margin-top: 18px;
-}
-
-.status-message.success {
-  color: #61e7a1;
-}
-
-.status-message.error {
-  color: #ff929e;
-}
-
-.empty-state {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  border: 1px dashed var(--border);
-  border-radius: 12px;
-  padding: 17px;
-  color: var(--muted);
-}
-
-.empty-state > span {
-  font-size: 2rem;
-}
-
-.empty-state p {
-  margin: 4px 0 0;
-  font-size: 0.75rem;
-}
-
-.hidden {
-  display: none !important;
-}
-
-.weather-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.weather-grid div {
-  border-radius: 10px;
-  background: rgba(3, 18, 31, 0.52);
-  padding: 11px;
-}
-
-.weather-grid span,
-.weather-grid strong {
-  display: block;
-}
-
-.weather-grid span {
-  color: var(--muted);
-  font-size: 0.68rem;
-}
-
-.weather-grid strong {
-  margin-top: 4px;
-  font-size: 0.82rem;
-}
-
-.table-wrapper {
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.72rem;
-}
-
-th,
-td {
-  border-bottom: 1px solid var(--border);
-  padding: 10px 5px;
-  text-align: left;
-  white-space: nowrap;
-}
-
-th {
-  color: var(--muted);
-}
-
-.no-data {
-  padding: 25px 5px;
-  color: var(--muted);
-  text-align: center;
-}
-
-.map-panel {
-  position: sticky;
-  top: 14px;
-  height: calc(100vh - 28px);
-  min-height: 760px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  box-shadow: var(--shadow);
-}
-
-#map {
-  width: 100%;
-  height: 100%;
-  min-height: 760px;
-}
-
-.map-message,
-.map-legend {
-  position: absolute;
-  z-index: 500;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: rgba(5, 23, 39, 0.93);
-  color: white;
-  padding: 11px 13px;
-  backdrop-filter: blur(12px);
-}
-
-.map-message {
-  top: 14px;
-  left: 58px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
