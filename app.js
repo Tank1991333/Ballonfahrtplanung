@@ -1,8 +1,14 @@
 "use strict";
 
-const heights = [10,30,50,80,100,120,150,180,200,250,300,400,500,600,750,1000,1250,1500,1750,2000,2250,2500,2750,3000];
-const defaultHeights = [80,100,150,180];
-const balloonHeights = heights.filter(height => height >= 80);
+if (typeof L === "undefined") {
+  const mapElement = document.getElementById("map");
+  if (mapElement) mapElement.innerHTML = '<div class="map-fallback">Die Karte konnte nicht geladen werden. Bitte Internetverbindung oder Browser-Schutz prüfen.</div>';
+  throw new Error("Leaflet wurde nicht geladen.");
+}
+
+const heights = [100, 300, 500, 800, 1000, 1500, 2000, 3000];
+const defaultHeights = [100, 500, 1000, 2000];
+const balloonHeights = [...heights];
 
 const latInput = document.getElementById("lat");
 const lonInput = document.getElementById("lon");
