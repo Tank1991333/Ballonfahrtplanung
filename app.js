@@ -1,208 +1,183 @@
 // ==========================================
-// 1. KARTEN-INITIALISIERUNG (LEAFLET)
+// 1. KARTEN-INITIALISIERUNG & SETUP
 // ==========================================
 
-// Standard-Koordinaten aus dem HTML auslesen (Hartberg)
-const defaultLat = parseFloat(document.getElementById('lat').value) || 47.28100;
-const defaultLon = parseFloat(document.getElementById('lon').value) || 15.97000;
+const startLat = parseFloat(document.getElementById('lat').value) || 47.16960;
+const startLon = parseFloat(document.getElementById('lon').value) || 16.00930;
 
-// Karte erzeugen und zentrieren
-const map = L.map('map', {
-    zoomControl: true
-}).setView([defaultLat, defaultLon], 13);
+// Karte im passenden dunklen Design laden (CartoDB DarkMatter)
+const map = L.map('map', { zoomControl: true }).setView([startLat, startLon], 12);
 
-// Dunkles Kacheldesign (CartoDB DarkMatter) – passt perfekt zu Ihrem Sci-Fi/Dark-CSS Theme
 L.tileLayer('https://{s}://{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors &copy; <a href="https://carto.com">CARTO</a>',
+    attribution: '&copy; OpenStreetMap &copy; CARTO',
     subdomains: 'abcd',
     maxZoom: 20
 }).addTo(map);
 
-// ==========================================
-// 2. STARTPLATZ-MARKER & SYNCHRONISIERUNG
-// ==========================================
-
-// Verschiebbarer Marker (Draggable) für den Ballonstartplatz
-const startMarker = L.marker([defaultLat, defaultLon], {
-    draggable: true
-}).addTo(map);
-
+// Startmarker erzeugen (Verschiebbar)
+const startMarker = L.marker([startLat, startLon], { draggable: true }).addTo(map);
 startMarker.bindPopup("<b>Startplatz</b><br>Bewege mich, um den Ort anzupassen.").openPopup();
 
-// DOM-Elemente für Koordinaten
+// DOM Elemente für die Koordinatenanzeigen
 const latInput = document.getElementById('lat');
 const lonInput = document.getElementById('lon');
-const updatePosButton = document.getElementById('update-position');
+const displayLat = document.getElementById('display-lat');
+const displayLon = document.getElementById('display-lon');
 
-// Wenn der Marker gezogen wird: Inputs updaten
-startMarker.on('dragend', function (e) {
-    const position = startMarker.getLatLng();
-    latInput.value = position.lat.toFixed(5);
-    lonInput.value = position.lng.toFixed(5);
+// Automatisches Update beim Verschieben des Markers
+startMarker.on('dragend', function () {
+    const pos = startMarker.getLatLng();
+    latInput.value = pos.lat.toFixed(5);
+    lonInput.value = pos.lng.toFixed(5);
+    displayLat.textContent = pos.lat.toFixed(5);
+    displayLon.textContent = pos.lng.toFixed(5);
 });
 
-// Button: Karte auf die manuell eingetippten Koordinaten zentrieren
-updatePosButton.addEventListener('click', () => {
-    const lat = parseFloat(latInput.value);
-    const lon = parseFloat(lonInput.value);
-    
-    if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
-        const newLatLng = new L.LatLng(lat, lon);
-        startMarker.setLatLng(newLatLng);
-        map.setView(newLatLng, 13);
-    } else {
-        alert("Bitte gültige Koordinaten eingeben (Breitengrad: -90 bis 90, Längengrad: -180 bis 180).");
-    }
+// Klick auf Karte setzt den Marker neu
+map.on('click', function(e) {
+    startMarker.setLatLng(e.latlng);
+    latInput.value = e.latlng.lat.toFixed(5);
+    lonInput.value = e.latlng.lng.toFixed(5);
+    displayLat.textContent = e.latlng.lat.toFixed(5);
+    displayLon.textContent = e.latlng.lng.toFixed(5);
 });
 
 // ==========================================
-// 3. DYNAMISCHE FORMULAR-LOGIK
+// 2. STEUERUNGSELEMENTE & SCHNELLAUSWAHL
 // ==========================================
 
-// Schieberegler für Flugdauer synchronisieren
-const durationInput = document.getElementById('duration');
+// Flugdauer Schieberegler synchronisieren
+const durationRange = document.getElementById('duration');
 const durationVal = document.getElementById('duration-val');
+durationRange.addEventListener('input', (e) => {
+    durationVal.textContent = parseFloat(e.target.value).toFixed(1) + " Stunden";
+});
 
-if (durationInput && durationVal) {
-    durationInput.addEventListener('input', (e) => {
-        durationVal.textContent = parseFloat(e.target.value).toFixed(1) + " Std";
-    });
-}
-
-// Datum und Uhrzeit auf aktuelle Werte vorbefüllen, falls leer
-const timeInput = document.getElementById('start');
+// Automatisches Vorbefüllen des heutigen Datums
 const dateInput = document.getElementById('date');
+const today = new Date().toISOString().split('T')[0];
+dateInput.value = today;
 
-if (timeInput && dateInput) {
-    const now = new Date();
-    // Zeit im Format HH:MM
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    timeInput.value = `${hours}:${minutes}`;
-    
-    // Datum im Format YYYY-MM-DD
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    dateInput.value = `${year}-${month}-${day}`;
-}
+// Logik für Schnellauswahl-Buttons (Aus Ihrem Screenshot)
+const checkboxes = document.querySelectorAll('#levels input[type="checkbox"]');
 
-// Array zur Speicherung gezeichneter Trajektorielinien auf der Karte
-let trajectoryLayers = [];
+document.getElementById('btn-all-levels').addEventListener('click', () => {
+    checkboxes.forEach(cb => cb.checked = true);
+});
+
+document.getElementById('btn-no-levels').addEventListener('click', () => {
+    checkboxes.forEach(cb => cb.checked = false);
+});
+
+document.getElementById('btn-balloon-levels').addEventListener('click', () => {
+    // Definiert typische Ballonhöhen (z.B. 80m, 100m, 150m)
+    const balloonAltitudes = ["80", "100", "150", "180"];
+    checkboxes.forEach(cb => {
+        cb.checked = balloonAltitudes.includes(cb.value);
+    });
+});
 
 // ==========================================
-// 4. BERECHNUNG & SIMULATION (DUMMY/API STUB)
+// 3. SIMULIERTE API-AUSFÜHRUNG & VISUALISIERUNG
 // ==========================================
 
-const runButton = document.getElementById('run');
-const statusBox = document.getElementById('status');
-const resultsBox = document.getElementById('results');
+let mapLayers = [];
+const statusMsg = document.getElementById('status');
+const resultsDiv = document.getElementById('results');
 
-runButton.addEventListener('click', () => {
-    // 1. Status auf "Berechnet..." setzen
-    statusBox.textContent = "Berechne...";
-    statusBox.className = "status-message"; // Reset Klassen
-    statusBox.style.color = "var(--orange)";
+document.getElementById('run').addEventListener('click', () => {
+    statusMsg.textContent = "Berechne Trajektorien...";
+    statusMsg.className = "status-message";
+    statusMsg.style.color = "var(--orange)";
 
-    // 2. Werte aus den Inputs sammeln
-    const lat = parseFloat(latInput.value);
-    const lon = parseFloat(lonInput.value);
-    const date = dateInput.value;
-    const time = timeInput.value;
-    const duration = parseFloat(durationInput.value);
-    const model = document.getElementById('model-display').value;
+    const currentLat = parseFloat(latInput.value);
+    const currentLon = parseFloat(lonInput.value);
+    const duration = parseFloat(durationRange.value);
 
-    // Ausgewählte Checkboxen sammeln
-    const checkedAltitudes = [];
+    // Ausgewählte Höhen einsammeln
+    let selectedHeights = [];
     document.querySelectorAll('#levels input[type="checkbox"]:checked').forEach(cb => {
-        checkedAltitudes.push(cb.value);
+        selectedHeights.push(cb.value);
     });
 
-    if (checkedAltitudes.length === 0) {
-        statusBox.textContent = "Fehler";
-        statusBox.style.color = "var(--red)";
-        alert("Bitte wähle mindestens eine Flughöhe aus!");
+    if (selectedHeights.length === 0) {
+        statusMsg.textContent = "Fehler!";
+        statusMsg.style.color = "var(--red)";
+        alert("Bitte wählen Sie mindestens eine Höhe aus!");
         return;
     }
 
-    // Altsystem-Layer löschen, falls bereits Linien existieren
-    trajectoryLayers.forEach(layer => map.removeLayer(layer));
-    trajectoryLayers = [];
+    // Alte Layer löschen
+    mapLayers.forEach(l => map.removeLayer(l));
+    mapLayers = [];
 
-    // 3. Simulation eines API-Requests mit Timeout (Simulierte Trajektorienberechnung)
+    // API Simulation (Ersetzen Sie dies später durch Ihren realen Fetch-Befehl zu Open-Meteo)
     setTimeout(() => {
-        statusBox.textContent = "Erfolgreich";
-        statusBox.style.color = "var(--green)";
+        statusMsg.textContent = "Berechnung abgeschlossen.";
+        statusMsg.style.color = "var(--green)";
 
-        // Demodaten generieren: Wir zeichnen Linien auf Basis der ausgewählten Höhen
-        // In der echten App ersetzen Sie dies durch den Fetch-Call Ihrer Wetter-API
         let tableRowsHtml = "";
+        const colors = ['var(--blue)', 'var(--green)', 'var(--orange)', 'var(--yellow)', 'var(--violet)', '#ff5252'];
 
-        checkedAltitudes.forEach((altitude, index) => {
-            // Generiere pseudo-zufällige Punkte, die sich je nach Höhe in Windrichtung bewegen
-            const pathCoordinates = [[lat, lon]];
-            const steps = duration * 2; // Alle 30 Min ein Punkt
+        selectedHeights.forEach((height, i) => {
+            let points = [[currentLat, currentLon]];
+            let steps = duration * 2; // Datenpunkte pro halbe Stunde
             
-            // Richtungsdrift je nach Höhe variieren (Simulierter Wind)
-            const driftLat = (index + 1) * 0.015;
-            const driftLon = (4 - index) * 0.025;
+            // Simulierter Winddriftvektor abhängig von der Höhe
+            let windDriftLat = 0.012 + (i * 0.003);
+            let windDriftLon = 0.022 - (i * 0.002);
 
-            let currentLat = lat;
-            let currentLon = lon;
+            let cLat = currentLat;
+            let cLon = currentLon;
 
             for(let s = 1; s <= steps; s++) {
-                currentLat += (Math.random() * 0.005) + driftLat;
-                currentLon += (Math.random() * 0.015) + driftLon;
-                pathCoordinates.push([currentLat, currentLon]);
+                cLat += windDriftLat + (Math.random() * 0.002 - 0.001);
+                cLon += windDriftLon + (Math.random() * 0.002 - 0.001);
+                points.push([cLat, cLon]);
             }
 
-            // Farben aus Ihrem CSS-Theme für unterschiedliche Höhenlinien wählen
-            const colors = ['var(--blue)', 'var(--violet)', 'var(--orange)', 'var(--yellow)'];
-            const lineColor = colors[index % colors.length];
+            const lineColor = colors[i % colors.length];
 
-            // 4. Linie (Polyline) auf der Karte einzeichnen
-            const polyline = L.polyline(pathCoordinates, {
+            // Linie auf Karte zeichnen
+            const polyline = L.polyline(points, {
                 color: lineColor,
                 weight: 4,
                 opacity: 0.8
             }).addTo(map);
-            
-            // Linien-Referenz merken, um sie später löschen zu können
-            trajectoryLayers.push(polyline);
+            mapLayers.push(polyline);
 
-            // Landemarker am Ende der Trajektorie setzen
-            const finalPoint = pathCoordinates[pathCoordinates.length - 1];
-            const landingMarker = L.circleMarker(finalPoint, {
+            // Letzten Endpunkt (Landung) markieren
+            const endPoint = points[points.length - 1];
+            const endMarker = L.circleMarker(endPoint, {
                 radius: 6,
                 fillColor: lineColor,
-                color: '#fff',
+                color: '#ffffff',
                 weight: 2,
                 fillOpacity: 1
-            }).addTo(map);
-            landingMarker.bindPopup(`<b>Landepunkt (${altitude} hPa)</b>`);
-            trajectoryLayers.push(landingMarker);
+            }).addTo(map).bindPopup(`<b>Endpunkt (${height} m)</b>`);
+            mapLayers.push(endMarker);
 
-            // Tabellenzeile für die Ergebnisspalte generieren
+            // Tabellen-Datenzeile aufbauen
             tableRowsHtml += `
                 <tr>
-                    <td><b style="color: ${lineColor}">■</b> ${altitude} hPa</td>
-                    <td>${finalPoint[0].toFixed(4)}</td>
-                    <td>${finalPoint[1].toFixed(4)}</td>
+                    <td><span style="display:inline-block; width:10px; height:10px; background:${lineColor}; border-radius:50%;"></span> ${height} m</td>
+                    <td>${endPoint[0].toFixed(4)}</td>
+                    <td>${endPoint[1].toFixed(4)}</td>
                 </tr>
             `;
         });
 
-        // Alle Linien im sichtbaren Bereich der Karte fokussieren
-        const group = new L.featureGroup(trajectoryLayers);
-        map.fitBounds(group.getBounds().pad(0.1));
+        // Karte optimal auf Ergebnisse fokussieren
+        const featureGroup = new L.featureGroup(mapLayers);
+        map.fitBounds(featureGroup.getBounds().pad(0.1));
 
-        // 5. Ergebnistabelle in das Panel (.results-column) schreiben
-        resultsBox.innerHTML = `
+        // Ergebnistabelle rendern
+        resultsDiv.innerHTML = `
             <div class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
-                            <th>Höhenschicht</th>
+                            <th>Höhe</th>
                             <th>Lat (Ende)</th>
                             <th>Lon (Ende)</th>
                         </tr>
@@ -214,5 +189,11 @@ runButton.addEventListener('click', () => {
             </div>
         `;
 
-    }, 1200); // 1.2 Sekunden Ladeanimation simulieren
+    }, 1000);
+});
+
+// Orts-Ortssuche (Dummy-Trigger für das Suchfeld)
+document.getElementById('search-button').addEventListener('click', () => {
+    const query = document.getElementById('search-location').value;
+    alert(`Ortssuche nach "${query}" gestartet.\n(Für eine Echtzeit-Suche kann hier eine Geocoding-API angebunden werden)`);
 });
