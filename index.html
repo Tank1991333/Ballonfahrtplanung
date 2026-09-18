@@ -2,96 +2,475 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Ballonfahrtplanung mit DWD ICON-D2, Windhöhen und Trajektorienkarte">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="description"
+    content="Interaktive Ballonfahrt-Simulation mit Startort, Höhenauswahl und Kartenanzeige"
+  >
+
   <meta name="theme-color" content="#08273f">
-  <title>Ballonfahrtplanung mit ICON-D2</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%88%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="./styles.css">
+
+  <title>Ballonfahrtplanung</title>
+
+  <link
+    rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%88%3C/text%3E%3Csheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  >
+
+  ./styles.css
 </head>
+
 <body>
-  <noscript><div class="noscript-warning">Für die Ballonfahrtplanung muss JavaScript aktiviert sein.</div></noscript>
+  <noscript>
+    <div class="noscript-warning">
+      Für diese Anwendung muss JavaScript im Browser aktiviert sein.
+    </div>
+  </noscript>
 
   <header class="hero">
     <div class="hero-content">
-      <div class="brand-icon" aria-hidden="true">🎈</div>
-      <div>
-        <span class="eyebrow">FLUGMETEOROLOGIE &amp; SIMULATION</span>
-        <h1>Ballonfahrtplanung</h1>
-        <p>Startort wählen, ICON-D2-Wind in mehreren Höhen vergleichen und Fahrtrichtungen auf der Karte darstellen.</p>
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">🎈</div>
+
+        <div>
+          <span class="eyebrow">
+            Flugmeteorologie und Simulation
+          </span>
+
+          <h1>Ballonfahrtplanung</h1>
+
+          <p class="hero-text">
+            Startort auswählen, verschiedene Höhen vergleichen und
+            simulierte Fahrtrichtungen auf der Karte anzeigen.
+          </p>
+        </div>
       </div>
-      <div class="technology-badge">DWD ICON-D2 via Open-Meteo</div>
+
+      <div class="technology-badge">
+        Interaktive Simulation
+      </div>
     </div>
   </header>
 
   <main class="app-layout">
+
+    <!-- Linke Spalte -->
     <aside class="sidebar">
+
+      <!-- Startort -->
       <section class="card">
-        <div class="section-title"><span class="step">1</span><h2>Startort</h2></div>
-        <label for="search-location">Ort oder Postleitzahl</label>
+        <div class="section-title">
+          <div class="step">1</div>
+          <h2>Startort auswählen</h2>
+        </div>
+
+        <p class="hint">
+          Ort oder Postleitzahl in Österreich eingeben:
+        </p>
+
         <div class="search-row">
-          <input id="search-location" type="search" value="Bad Waltersdorf" placeholder="z. B. Hartberg">
-          <button id="search-button" type="button">Suchen</button>
+          <input
+            id="search-location"
+            type="search"
+            value="Bad Waltersdorf"
+            placeholder="z. B. Hartberg"
+            autocomplete="off"
+          >
+
+          <button id="search-button" type="button">
+            Suchen
+          </button>
         </div>
-        <p class="hint">Alternativ auf die Karte klicken oder den Marker verschieben.</p>
+
+        <p class="hint location-hint">
+          Der Startpunkt kann auch direkt auf der Karte angeklickt oder
+          durch Verschieben des blauen Markers geändert werden.
+        </p>
+
         <div class="location-box">
-          <span class="pin">📍</span>
-          <div><strong id="current-location-name">Bad Waltersdorf</strong><div class="coordinates">Breite: <b id="display-lat">47.16960</b><br>Länge: <b id="display-lon">16.00930</b></div></div>
+          <div class="pin" aria-hidden="true">📍</div>
+
+          <div class="location-information">
+            <strong id="current-location-name">
+              Bad Waltersdorf
+            </strong>
+
+            <div class="coordinates">
+              <span>
+                Breitengrad:
+                <b id="display-lat">47.16960</b>
+              </span>
+
+              <span>
+                Längengrad:
+                <b id="display-lon">16.00930</b>
+              </span>
+            </div>
+          </div>
         </div>
-        <input type="hidden" id="lat" value="47.16960">
-        <input type="hidden" id="lon" value="16.00930">
+
+        <input
+          id="lat"
+          type="hidden"
+          value="47.16960"
+        >
+
+        <input
+          id="lon"
+          type="hidden"
+          value="16.00930"
+        >
       </section>
 
+      <!-- Fahrtdaten -->
       <section class="card">
-        <div class="section-title"><span class="step">2</span><h2>Fahrtdaten</h2></div>
+        <div class="section-title">
+          <div class="step">2</div>
+          <h2>Fahrtdaten</h2>
+        </div>
+
         <div class="field-grid">
-          <div><label for="date">Datum</label><input id="date" type="date"></div>
-          <div><label for="start">Startzeit</label><input id="start" type="time" value="07:00"></div>
+          <div>
+            <label for="date">Datum</label>
+            <input id="date" type="date">
+          </div>
+
+          <div>
+            <label for="start">Startzeit</label>
+
+            <input
+              id="start"
+              type="time"
+              value="07:00"
+            >
+          </div>
         </div>
-        <div class="range-header"><label for="duration">Fahrtdauer</label><strong id="duration-val">1,5 Stunden</strong></div>
-        <input id="duration" type="range" min="0.5" max="12" step="0.5" value="1.5">
-        <div class="range-labels"><span>0,5 h</span><span>6 h</span><span>12 h</span></div>
+
+        <div class="duration-section">
+          <div class="range-header">
+            <label for="duration">Flugdauer</label>
+
+            <strong id="duration-val">
+              1,5 Stunden
+            </strong>
+          </div>
+
+          <input
+            id="duration"
+            type="range"
+            min="0.5"
+            max="12"
+            step="0.5"
+            value="1.5"
+          >
+
+          <div class="range-labels">
+            <span>0,5 h</span>
+            <span>6 h</span>
+            <span>12 h</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Hinweis -->
+      <section class="card information-card">
+        <div class="information-icon" aria-hidden="true">ℹ️</div>
+
+        <div>
+          <strong>Wichtiger Hinweis</strong>
+
+          <p>
+            Die angezeigten Fahrtrichtungen werden künstlich simuliert.
+            Es werden keine echten Wind- oder Wetterdaten verwendet.
+          </p>
+        </div>
       </section>
     </aside>
 
+    <!-- Mittlere Spalte -->
     <aside class="results-column">
+
+      <!-- Höhenauswahl -->
       <section class="card">
-        <div class="section-title"><span class="step">3</span><h2>Höhen &amp; Wetter</h2></div>
-        <div class="model-box"><span class="model-dot"></span><div><strong>DWD ICON-D2</strong><small>hochaufgelöstes Kurzfristmodell</small></div></div>
-        <p class="hint">Direkt verfügbare Modellhöhen: 10, 80, 120 und 180 m. Zwischenhöhen werden linear interpoliert.</p>
+        <div class="section-title">
+          <div class="step">3</div>
+          <h2>Höhen auswählen</h2>
+        </div>
+
+        <p class="hint">
+          Es können mehrere Höhen gleichzeitig ausgewählt werden.
+          Für jede ausgewählte Höhe wird eine eigene Route dargestellt.
+        </p>
+
         <div class="level-actions">
-          <button type="button" id="btn-balloon-levels">Ballonhöhen</button><button type="button" id="btn-all-levels">Alle</button><button type="button" id="btn-no-levels">Keine</button>
+          <button id="btn-balloon-levels" type="button">
+            Ballonhöhen
+          </button>
+
+          <button id="btn-all-levels" type="button">
+            Alle
+          </button>
+
+          <button id="btn-no-levels" type="button">
+            Keine
+          </button>
         </div>
+
+        <span class="level-heading">
+          Höhen über Grund
+        </span>
+
         <div id="levels" class="height-selector">
-          <label><input type="checkbox" name="altitude" value="10"><span>10 m</span></label>
-          <label><input type="checkbox" name="altitude" value="30"><span>30 m</span></label>
-          <label><input type="checkbox" name="altitude" value="80" checked><span>80 m</span></label>
-          <label><input type="checkbox" name="altitude" value="100" checked><span>100 m</span></label>
-          <label><input type="checkbox" name="altitude" value="120"><span>120 m</span></label>
-          <label><input type="checkbox" name="altitude" value="150" checked><span>150 m</span></label>
-          <label><input type="checkbox" name="altitude" value="180" checked><span>180 m</span></label>
-          <label><input type="checkbox" name="altitude" value="200"><span>200 m</span></label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="10">
+            <span>10 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="30">
+            <span>30 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="50">
+            <span>50 m</span>
+          </label>
+
+          <label>
+            <input
+              type="checkbox"
+              name="altitude"
+              value="80"
+              checked
+            >
+            <span>80 m</span>
+          </label>
+
+          <label>
+            <input
+              type="checkbox"
+              name="altitude"
+              value="100"
+              checked
+            >
+            <span>100 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="120">
+            <span>120 m</span>
+          </label>
+
+          <label>
+            <input
+              type="checkbox"
+              name="altitude"
+              value="150"
+              checked
+            >
+            <span>150 m</span>
+          </label>
+
+          <label>
+            <input
+              type="checkbox"
+              name="altitude"
+              value="180"
+              checked
+            >
+            <span>180 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="200">
+            <span>200 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="250">
+            <span>250 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="300">
+            <span>300 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="400">
+            <span>400 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="500">
+            <span>500 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="600">
+            <span>600 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="750">
+            <span>750 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="1000">
+            <span>1.000 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="1250">
+            <span>1.250 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="1500">
+            <span>1.500 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="1750">
+            <span>1.750 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="2000">
+            <span>2.000 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="2250">
+            <span>2.250 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="2500">
+            <span>2.500 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="2750">
+            <span>2.750 m</span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="altitude" value="3000">
+            <span>3.000 m</span>
+          </label>
         </div>
-        <button id="run" type="button" class="primary-button">ICON-D2 berechnen</button>
-        <div id="status" class="status-message" role="status" aria-live="polite">Bereit.</div>
+
+        <div class="selection-summary">
+          <span>Ausgewählte Höhen:</span>
+          <strong id="selected-count">4</strong>
+        </div>
+
+        <button
+          id="run"
+          type="button"
+          class="primary-button"
+        >
+          Simulation ausführen
+        </button>
+
+        <div class="status-wrapper">
+          <span
+            id="status"
+            class="status-message success"
+            aria-live="polite"
+          >
+            Bereit.
+          </span>
+        </div>
       </section>
 
-      <section class="card">
-        <div class="section-title"><h2>Wetter &amp; Ergebnisse</h2></div>
-        <div id="current-weather" class="current-weather"><span>🌬️</span><div><small>Aktueller Wind am Startort</small><strong id="current-wind">Noch nicht geladen</strong><div id="current-direction">Richtung: --</div></div></div>
-        <div id="results"><div class="empty-state"><span>📊</span><div><strong>Keine Berechnung</strong><p>Auf „ICON-D2 berechnen“ klicken.</p></div></div></div>
+      <!-- Ergebnisse -->
+      <section class="card results-card">
+        <div class="section-title compact">
+          <h2>Simulationsergebnisse</h2>
+        </div>
+
+        <div id="results">
+          <div class="empty-state">
+            <span aria-hidden="true">📊</span>
+
+            <div>
+              <strong>Keine Daten berechnet</strong>
+
+              <p>
+                Klicke auf „Simulation ausführen“, um die
+                Trajektorien anzuzeigen.
+              </p>
+            </div>
+          </div>
+        </div>
       </section>
     </aside>
 
-    <section class="map-panel" aria-label="Trajektorienkarte">
-      <div id="map"></div>
-      <div class="map-message"><span class="model-dot"></span><div><span class="eyebrow">SYSTEMSTATUS</span><small>Karte bereit</small></div></div>
-      <div class="map-legend"><strong>Kartenanzeige</strong><div><i class="legend-start"></i> Startplatz</div><div><i class="legend-route"></i> berechnete Fahrtrichtung</div></div>
+    <!-- Rechte Spalte -->
+    <section class="map-panel">
+      <div
+        id="map"
+        aria-label="Interaktive Karte für die Ballonfahrt-Simulation"
+      ></div>
+
+      <div class="map-message">
+        <span class="status-dot"></span>
+
+        <div>
+          <span class="map-status-title">
+            Systemstatus
+          </span>
+
+          <small>Karte geladen</small>
+        </div>
+      </div>
+
+      <div class="map-legend">
+        <strong>Kartenanzeige</strong>
+
+        <div class="legend-entry">
+          <span class="legend-symbol legend-start"></span>
+          Startplatz
+        </div>
+
+        <div class="legend-entry">
+          <span class="legend-symbol legend-route"></span>
+          Simulierte Route
+        </div>
+
+        <div class="legend-entry">
+          <span class="legend-symbol legend-end"></span>
+          Simulierter Endpunkt
+        </div>
+      </div>
     </section>
   </main>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="./app.js"></script>
+  <footer class="page-footer">
+    <p>
+      Nur Demonstration: Die dargestellten Flugbahnen sind keine
+      meteorologischen oder sicherheitsrelevanten Flugprognosen.
+    </p>
+  </footer>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  ./app.jsscript>
 </body>
 </html>
