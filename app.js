@@ -1,11 +1,25 @@
 "use strict";
 
 /*
-  Ballonfahrt-Planer
+  ============================================================
+  BALLOON FLIGHT PLANNER
+  ============================================================
 
-  Wichtiger Hinweis:
-  Diese Anwendung ist nur eine vereinfachte Planungshilfe.
-  Sie darf nicht für operative Flugentscheidungen verwendet werden.
+  Diese Anwendung ist eine vereinfachte Planungshilfe.
+
+  Die berechneten Linien sind keine realen Flugbahnen.
+  Die Anwendung ersetzt keine:
+  - offizielle Flugwetterberatung
+  - Luftraumprüfung
+  - Hindernisprüfung
+  - Landeflächenprüfung
+  - Entscheidung des verantwortlichen Ballonpiloten
+*/
+
+/*
+  ============================================================
+  GRUNDEINSTELLUNGEN
+  ============================================================
 */
 
 const DEFAULT_LOCATION = {
@@ -14,21 +28,27 @@ const DEFAULT_LOCATION = {
   longitude: 16.0093
 };
 
-const HEIGHTS = [10, 80, 120, 180];
+const AVAILABLE_HEIGHTS = [10, 80, 120, 180];
 
 const ROUTE_COLORS = {
-  10: "#22c55e",
-  80: "#f59e0b",
-  120: "#ef4444",
-  180: "#8b5cf6"
+  10: "#43d17c",
+  80: "#ffad33",
+  120: "#ff5252",
+  180: "#b25cff"
 };
 
 const state = {
   location: { ...DEFAULT_LOCATION },
   weather: null,
   routeLayers: [],
-  endMarkers: []
+  destinationMarkers: []
 };
+
+/*
+  ============================================================
+  HTML-ELEMENTE
+  ============================================================
+*/
 
 const elements = {
   locationInput: document.getElementById("locationInput"),
@@ -37,7 +57,9 @@ const elements = {
 
   latitudeValue: document.getElementById("latitudeValue"),
   longitudeValue: document.getElementById("longitudeValue"),
-  selectedLocationName: document.getElementById("selectedLocationName"),
+  selectedLocationName: document.getElementById(
+    "selectedLocationName"
+  ),
 
   flightDate: document.getElementById("flightDate"),
   flightTime: document.getElementById("flightTime"),
@@ -45,90 +67,202 @@ const elements = {
   durationValue: document.getElementById("durationValue"),
   heightSelect: document.getElementById("heightSelect"),
 
-  loadWeatherButton: document.getElementById("loadWeatherButton"),
+  loadWeatherButton: document.getElementById(
+    "loadWeatherButton"
+  ),
+
   statusMessage: document.getElementById("statusMessage"),
 
   weatherEmpty: document.getElementById("weatherEmpty"),
   weatherContent: document.getElementById("weatherContent"),
 
   forecastTime: document.getElementById("forecastTime"),
-  temperatureValue: document.getElementById("temperatureValue"),
-  precipitationValue: document.getElementById("precipitationValue"),
-  cloudCoverValue: document.getElementById("cloudCoverValue"),
+  forecastTimeMirror: document.getElementById(
+    "forecastTimeMirror"
+  ),
 
-  selectedHeightValue: document.getElementById("selectedHeightValue"),
-  windSpeedValue: document.getElementById("windSpeedValue"),
-  windFromValue: document.getElementById("windFromValue"),
+  temperatureValue: document.getElementById(
+    "temperatureValue"
+  ),
+
+  precipitationValue: document.getElementById(
+    "precipitationValue"
+  ),
+
+  cloudCoverValue: document.getElementById(
+    "cloudCoverValue"
+  ),
+
+  selectedHeightValue: document.getElementById(
+    "selectedHeightValue"
+  ),
+
+  windSpeedValue: document.getElementById(
+    "windSpeedValue"
+  ),
+
+  windFromValue: document.getElementById(
+    "windFromValue"
+  ),
+
   travelDirectionValue: document.getElementById(
     "travelDirectionValue"
   ),
-  distanceValue: document.getElementById("distanceValue"),
 
+  distanceValue: document.getElementById("distanceValue"),
   windTableBody: document.getElementById("windTableBody")
 };
 
 /*
-  Karte initialisieren
+  ============================================================
+  KARTE INITIALISIEREN
+  ============================================================
 */
 
-const map = L.map("map", {
-  zoomControl: true
-}).setView(
-  [DEFAULT_LOCATION.latitude, DEFAULT_LOCATION.longitude],
-  11
-);
+let map = null;
+let startMarker = null;
 
-L.tileLayer(
-  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-  {
-    maxZoom: 19,
-    attribution:
-      '&copy; https://www.openstreetmap.org/copyright' +
-      "OpenStreetMap-Mitwirkende</a>"
+function initializeMap() {
+  if (typeof L === "undefined") {
+    setStatus(
+      "Die Karte konnte nicht geladen werden. Bitte prüfe die Leaflet-Einbindung in der index.html.",
+      "error"
+    );
+
+    return;
   }
-).addTo(map);
 
-const startMarker = L.marker(
-  [DEFAULT_LOCATION.latitude, DEFAULT_LOCATION.longitude],
-  {
-    draggable: true,
-    title: "Startpunkt"
-  }
-).addTo(map);
-
-startMarker
-  .bindPopup("<strong>Startpunkt</strong><br>Bad Waltersdorf")
-  .openPopup();
-
-/*
-  Datum auf den kommenden Sonntag setzen.
-*/
-
-function setDefaultDateToNextSunday() {
-  const today = new Date();
-  const result = new Date(today);
-
-  const daysUntilSunday = (7 - today.getDay()) % 7;
-  result.setDate(
-    today.getDate() + (daysUntilSunday === 0 ? 7 : daysUntilSunday)
+  map = L.map("map", {
+    zoomControl: true,
+    attributionControl: true
+  }).setView(
+    [
+      DEFAULT_LOCATION.latitude,
+      DEFAULT_LOCATION.longitude
+    ],
+    11
   );
 
-  elements.flightDate.value = formatDateForInput(result);
+  L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+      maxZoom: 19,
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer;
+
+  startMarker = L.marker(
+    [
+      DEFAULT_LOCATION.latitude,
+      DEFAULT_LOCATION.longitude
+    ],
+    {
+      draggable: true,
+      title: "Startpunkt verschieben"
+    }
+  ).addTo(map);
+
+  updateStartMarkerPopup();
+
+  /*
+    Startpunkt mit Kartenklick setzen
+  */
+
+  map.on("click", function (event) {
+    elements.locationInput.value = "";
+    elements.searchResults.innerHTML = "";
+
+    setLocation(
+      {
+        name: "Ausgewählter Kartenpunkt",
+        latitude: event.latlng.lat,
+        longitude: event.latlng.lng
+      },
+      map.getZoom()
+    );
+  });
+
+  /*
+    Startmarker verschieben
+  */
+
+  startMarker.on("dragend", function () {
+    const coordinates = startMarker.getLatLng();
+
+    elements.locationInput.value = "";
+    elements.searchResults.innerHTML = "";
+
+    setLocation(
+      {
+        name: "Verschobener Startpunkt",
+        latitude: coordinates.lat,
+        longitude: coordinates.lng
+      },
+      map.getZoom()
+    );
+  });
+
+  window.setTimeout(function () {
+    map.invalidateSize();
+  }, 300);
+}
+
+/*
+  ============================================================
+  STANDARD-DATUM EINSTELLEN
+  ============================================================
+*/
+
+function setDefaultFlightDate() {
+  const today = new Date();
+  const nextSunday = new Date(today);
+
+  let daysUntilSunday = (7 - today.getDay()) % 7;
+
+  /*
+    Wenn heute Sonntag ist, wird der heutige Sonntag verwendet.
+  */
+
+  if (daysUntilSunday === 0) {
+    daysUntilSunday = 0;
+  }
+
+  nextSunday.setDate(today.getDate() + daysUntilSunday);
+
+  elements.flightDate.value =
+    formatDateForInput(nextSunday);
+
+  /*
+    Kein vergangenes Datum erlauben
+  */
+
+  elements.flightDate.min = formatDateForInput(today);
 }
 
 function formatDateForInput(date) {
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+
+  const month = String(
+    date.getMonth() + 1
+  ).padStart(2, "0");
+
+  const day = String(
+    date.getDate()
+  ).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
 }
 
 /*
-  Hilfsfunktionen
+  ============================================================
+  STATUSMELDUNGEN
+  ============================================================
 */
 
 function setStatus(message, type = "") {
+  if (!elements.statusMessage) {
+    return;
+  }
+
   elements.statusMessage.textContent = message;
   elements.statusMessage.className = "status-message";
 
@@ -137,54 +271,130 @@ function setStatus(message, type = "") {
   }
 }
 
-function updateLocationDisplay() {
-  elements.latitudeValue.textContent =
-    state.location.latitude.toFixed(5);
+/*
+  ============================================================
+  STARTORT VERWALTEN
+  ============================================================
+*/
 
-  elements.longitudeValue.textContent =
-    state.location.longitude.toFixed(5);
+function setLocation(location, zoomLevel = 12) {
+  const latitude = Number(location.latitude);
+  const longitude = Number(location.longitude);
 
-  elements.selectedLocationName.textContent =
-    state.location.name;
-}
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude)
+  ) {
+    setStatus(
+      "Die Koordinaten des ausgewählten Ortes sind ungültig.",
+      "error"
+    );
 
-function setLocation(location, zoom = 12) {
+    return;
+  }
+
   state.location = {
-    name: location.name,
-    latitude: Number(location.latitude),
-    longitude: Number(location.longitude)
+    name: location.name || "Ausgewählter Startpunkt",
+    latitude,
+    longitude
   };
 
-  const coordinates = [
-    state.location.latitude,
-    state.location.longitude
-  ];
-
-  startMarker.setLatLng(coordinates);
-
-  startMarker.bindPopup(
-    `<strong>Startpunkt</strong><br>${escapeHtml(
-      state.location.name
-    )}`
-  );
-
-  map.setView(coordinates, zoom);
   updateLocationDisplay();
 
-  clearRoutes();
+  if (map && startMarker) {
+    const coordinates = [latitude, longitude];
 
-  elements.weatherContent.classList.add("hidden");
-  elements.weatherEmpty.classList.remove("hidden");
-  elements.windTableBody.innerHTML = `
-    <tr>
-      <td colspan="4">Noch keine Daten</td>
-    </tr>
-  `;
+    startMarker.setLatLng(coordinates);
+    updateStartMarkerPopup();
+
+    map.setView(coordinates, zoomLevel);
+  }
+
+  clearRoutes();
+  resetWeatherDisplay();
 
   setStatus(
-    "Neuer Startort gewählt. Jetzt Wetterdaten laden."
+    "Neuer Startort ausgewählt. Lade jetzt die Wetterdaten.",
+    "success"
   );
 }
+
+function updateLocationDisplay() {
+  if (elements.latitudeValue) {
+    elements.latitudeValue.textContent =
+      state.location.latitude.toFixed(5);
+  }
+
+  if (elements.longitudeValue) {
+    elements.longitudeValue.textContent =
+      state.location.longitude.toFixed(5);
+  }
+
+  if (elements.selectedLocationName) {
+    elements.selectedLocationName.textContent =
+      state.location.name;
+  }
+}
+
+function updateStartMarkerPopup() {
+  if (!startMarker) {
+    return;
+  }
+
+  const popupContent = `
+    <div style="min-width:180px">
+      <strong>🎈 Startpunkt</strong>
+      <br>
+      ${escapeHtml(state.location.name)}
+      <br><br>
+      <small>
+        ${state.location.latitude.toFixed(5)},
+        ${state.location.longitude.toFixed(5)}
+      </small>
+    </div>
+  `;
+
+  startMarker.bindPopup(popupContent);
+}
+
+/*
+  ============================================================
+  WETTERANZEIGE ZURÜCKSETZEN
+  ============================================================
+*/
+
+function resetWeatherDisplay() {
+  state.weather = null;
+
+  if (elements.weatherContent) {
+    elements.weatherContent.classList.add("hidden");
+  }
+
+  if (elements.weatherEmpty) {
+    elements.weatherEmpty.classList.remove("hidden");
+  }
+
+  if (elements.windTableBody) {
+    elements.windTableBody.innerHTML = `
+      <tr>
+        <td colspan="4" class="no-data-cell">
+          Noch keine Daten
+        </td>
+      </tr>
+    `;
+  }
+
+  if (elements.forecastTimeMirror) {
+    elements.forecastTimeMirror.textContent =
+      "siehe Ergebnis";
+  }
+}
+
+/*
+  ============================================================
+  HTML SICHER AUSGEBEN
+  ============================================================
+*/
 
 function escapeHtml(value) {
   return String(value)
@@ -193,6 +403,482 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+/*
+  ============================================================
+  ORTSSUCHE
+  ============================================================
+*/
+
+async function searchLocation() {
+  const searchTerm =
+    elements.locationInput.value.trim();
+
+  if (searchTerm.length < 2) {
+    setStatus(
+      "Bitte mindestens zwei Zeichen für die Ortssuche eingeben.",
+      "error"
+    );
+
+    return;
+  }
+
+  setSearchButtonLoading(true);
+  elements.searchResults.innerHTML = "";
+
+  setStatus("Der Ort wird gesucht...");
+
+  try {
+    const url = new URL(
+      "https://geocoding-api.open-meteo.com/v1/search"
+    );
+
+    url.searchParams.set("name", searchTerm);
+    url.searchParams.set("count", "8");
+    url.searchParams.set("language", "de");
+    url.searchParams.set("format", "json");
+
+    const response = await fetch(url.toString());
+
+    if (!response.ok) {
+      throw new Error(
+        `HTTP-Fehler bei der Ortssuche: ${response.status}`
+      );
+    }
+
+    const data = await response.json();
+    const results = data.results || [];
+
+    if (results.length === 0) {
+      elements.searchResults.innerHTML = `
+        <div class="empty-state">
+          <div>
+            <strong>Kein Ort gefunden</strong>
+            <p>
+              Versuche es mit Ort und Land, zum Beispiel
+              „Bad Waltersdorf, Österreich“.
+            </p>
+          </div>
+        </div>
+      `;
+
+      setStatus(
+        "Für den Suchbegriff wurde kein Ort gefunden.",
+        "error"
+      );
+
+      return;
+    }
+
+    renderSearchResults(results);
+
+    setStatus(
+      `${results.length} mögliche Orte gefunden. Wähle den passenden Ort aus.`,
+      "success"
+    );
+  } catch (error) {
+    console.error("Fehler bei der Ortssuche:", error);
+
+    setStatus(
+      "Die Ortssuche konnte nicht geladen werden. Bitte versuche es später erneut.",
+      "error"
+    );
+  } finally {
+    setSearchButtonLoading(false);
+  }
+}
+
+function setSearchButtonLoading(isLoading) {
+  if (!elements.searchButton) {
+    return;
+  }
+
+  elements.searchButton.disabled = isLoading;
+
+  elements.searchButton.innerHTML = isLoading
+    ? "<span>⌛</span> Suche läuft"
+    : "<span>⌕</span> Suchen";
+}
+
+function renderSearchResults(results) {
+  elements.searchResults.innerHTML = "";
+
+  results.forEach(function (result) {
+    const button = document.createElement("button");
+
+    button.type = "button";
+    button.className = "search-result-button";
+
+    const locationDescription = [
+      result.postcodes?.[0],
+      result.admin2,
+      result.admin1,
+      result.country
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    button.innerHTML = `
+      <strong>${escapeHtml(result.name)}</strong>
+      <span>${escapeHtml(locationDescription)}</span>
+    `;
+
+    button.addEventListener("click", function () {
+      const fullLocationName = [
+        result.name,
+        result.admin1,
+        result.country
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      elements.locationInput.value = result.name;
+      elements.searchResults.innerHTML = "";
+
+      setLocation({
+        name: fullLocationName,
+        latitude: result.latitude,
+        longitude: result.longitude
+      });
+    });
+
+    elements.searchResults.appendChild(button);
+  });
+}
+
+/*
+  ============================================================
+  WETTERDATEN LADEN
+  ============================================================
+*/
+
+async function loadWeather() {
+  const selectedDate = elements.flightDate.value;
+  const selectedTime = elements.flightTime.value;
+
+  if (!selectedDate || !selectedTime) {
+    setStatus(
+      "Bitte Datum und Startzeit auswählen.",
+      "error"
+    );
+
+    return;
+  }
+
+  setWeatherButtonLoading(true);
+  setStatus("Die Wetterprognose wird geladen...");
+
+  try {
+    const url = createWeatherApiUrl(selectedDate);
+
+    const response = await fetch(url.toString());
+
+    if (!response.ok) {
+      throw new Error(
+        `HTTP-Fehler bei der Wetterabfrage: ${response.status}`
+      );
+    }
+
+    const data = await response.json();
+
+    if (
+      !data.hourly ||
+      !Array.isArray(data.hourly.time) ||
+      data.hourly.time.length === 0
+    ) {
+      throw new Error(
+        "Die Wetterantwort enthält keine stündlichen Daten."
+      );
+    }
+
+    const requestedDateTime =
+      `${selectedDate}T${selectedTime}`;
+
+    const timeIndex = getNearestTimeIndex(
+      data.hourly.time,
+      requestedDateTime
+    );
+
+    const weather = createWeatherObject(
+      data,
+      timeIndex
+    );
+
+    validateWeatherObject(weather);
+
+    state.weather = weather;
+
+    renderWeather(weather);
+    renderWindTable(weather);
+    drawRoutes(weather);
+    updateForecastMirror(weather);
+
+    setStatus(
+      "Wetterdaten erfolgreich geladen. Vergleiche jetzt die verschiedenen Windhöhen.",
+      "success"
+    );
+  } catch (error) {
+    console.error(
+      "Fehler bei der Wetterabfrage:",
+      error
+    );
+
+    setStatus(
+      "Die Wetterdaten konnten nicht geladen werden. Das ausgewählte Datum liegt möglicherweise außerhalb des verfügbaren Vorhersagezeitraums.",
+      "error"
+    );
+  } finally {
+    setWeatherButtonLoading(false);
+  }
+}
+
+function createWeatherApiUrl(selectedDate) {
+  const url = new URL(
+    "https://api.open-meteo.com/v1/forecast"
+  );
+
+  url.searchParams.set(
+    "latitude",
+    String(state.location.latitude)
+  );
+
+  url.searchParams.set(
+    "longitude",
+    String(state.location.longitude)
+  );
+
+  const hourlyParameters = [
+    "temperature_2m",
+    "precipitation",
+    "cloud_cover",
+    "wind_speed_10m",
+    "wind_direction_10m",
+    "wind_speed_80m",
+    "wind_direction_80m",
+    "wind_speed_120m",
+    "wind_direction_120m",
+    "wind_speed_180m",
+    "wind_direction_180m"
+  ];
+
+  url.searchParams.set(
+    "hourly",
+    hourlyParameters.join(",")
+  );
+
+  url.searchParams.set("timezone", "auto");
+  url.searchParams.set("wind_speed_unit", "kmh");
+  url.searchParams.set("start_date", selectedDate);
+  url.searchParams.set("end_date", selectedDate);
+
+  return url;
+}
+
+function setWeatherButtonLoading(isLoading) {
+  if (!elements.loadWeatherButton) {
+    return;
+  }
+
+  elements.loadWeatherButton.disabled = isLoading;
+
+  elements.loadWeatherButton.innerHTML = isLoading
+    ? "<span>⌛</span> Wetterdaten werden geladen"
+    : "<span>☁</span> Wetterdaten laden";
+}
+
+/*
+  ============================================================
+  ZEITPUNKT FINDEN
+  ============================================================
+*/
+
+function getNearestTimeIndex(times, requestedDateTime) {
+  const requestedTimestamp = new Date(
+    requestedDateTime
+  ).getTime();
+
+  let nearestIndex = 0;
+  let smallestDifference = Infinity;
+
+  times.forEach(function (time, index) {
+    const timestamp = new Date(time).getTime();
+
+    const difference = Math.abs(
+      timestamp - requestedTimestamp
+    );
+
+    if (difference < smallestDifference) {
+      smallestDifference = difference;
+      nearestIndex = index;
+    }
+  });
+
+  return nearestIndex;
+}
+
+/*
+  ============================================================
+  WETTEROBJEKT ERSTELLEN
+  ============================================================
+*/
+
+function createWeatherObject(data, index) {
+  const hourly = data.hourly;
+  const winds = {};
+
+  AVAILABLE_HEIGHTS.forEach(function (height) {
+    const speedKey = `wind_speed_${height}m`;
+    const directionKey =
+      `wind_direction_${height}m`;
+
+    winds[height] = {
+      speed: Number(hourly[speedKey]?.[index]),
+      directionFrom: Number(
+        hourly[directionKey]?.[index]
+      )
+    };
+  });
+
+  return {
+    forecastTime: hourly.time[index],
+    temperature: Number(
+      hourly.temperature_2m?.[index]
+    ),
+    precipitation: Number(
+      hourly.precipitation?.[index]
+    ),
+    cloudCover: Number(
+      hourly.cloud_cover?.[index]
+    ),
+    winds
+  };
+}
+
+function validateWeatherObject(weather) {
+  if (!weather.forecastTime) {
+    throw new Error("Prognosezeit fehlt.");
+  }
+
+  AVAILABLE_HEIGHTS.forEach(function (height) {
+    const wind = weather.winds[height];
+
+    if (
+      !wind ||
+      !Number.isFinite(wind.speed) ||
+      !Number.isFinite(wind.directionFrom)
+    ) {
+      throw new Error(
+        `Winddaten für ${height} m fehlen.`
+      );
+    }
+  });
+}
+
+/*
+  ============================================================
+  WETTERERGEBNIS ANZEIGEN
+  ============================================================
+*/
+
+function renderWeather(weather) {
+  const selectedHeight = Number(
+    elements.heightSelect.value
+  );
+
+  const selectedWind =
+    weather.winds[selectedHeight];
+
+  const travelDirection =
+    normalizeDegrees(
+      selectedWind.directionFrom + 180
+    );
+
+  const duration = Number(
+    elements.flightDuration.value
+  );
+
+  const distance =
+    selectedWind.speed * duration;
+
+  elements.weatherEmpty.classList.add("hidden");
+  elements.weatherContent.classList.remove("hidden");
+
+  elements.forecastTime.textContent =
+    formatForecastTime(weather.forecastTime);
+
+  elements.temperatureValue.textContent =
+    `${formatNumber(weather.temperature, 1)} °C`;
+
+  elements.precipitationValue.textContent =
+    `${formatNumber(weather.precipitation, 1)} mm`;
+
+  elements.cloudCoverValue.textContent =
+    `${Math.round(weather.cloudCover)} %`;
+
+  elements.selectedHeightValue.textContent =
+    `${selectedHeight} m über Grund`;
+
+  elements.windSpeedValue.textContent =
+    `${formatNumber(selectedWind.speed, 1)} km/h`;
+
+  elements.windFromValue.textContent =
+    `${degreesToCompass(
+      selectedWind.directionFrom
+    )} (${Math.round(
+      selectedWind.directionFrom
+    )}°)`;
+
+  elements.travelDirectionValue.textContent =
+    `${degreesToCompass(
+      travelDirection
+    )} (${Math.round(travelDirection)}°)`;
+
+  elements.distanceValue.textContent =
+    `${formatNumber(distance, 1)} km`;
+}
+
+function updateForecastMirror(weather) {
+  if (!elements.forecastTimeMirror) {
+    return;
+  }
+
+  elements.forecastTimeMirror.textContent =
+    formatForecastTime(weather.forecastTime);
+}
+
+function formatNumber(value, decimals = 1) {
+  if (!Number.isFinite(Number(value))) {
+    return "–";
+  }
+
+  return Number(value).toLocaleString("de-AT", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  });
+}
+
+function formatForecastTime(value) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("de-AT", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(date);
+}
+
+/*
+  ============================================================
+  WINDRICHTUNGEN
+  ============================================================
+*/
+
+function normalizeDegrees(degrees) {
+  return ((degrees % 360) + 360) % 360;
 }
 
 function degreesToCompass(degrees) {
@@ -215,415 +901,30 @@ function degreesToCompass(degrees) {
     "NNW"
   ];
 
-  const normalized = ((degrees % 360) + 360) % 360;
-  const index = Math.round(normalized / 22.5) % 16;
+  const normalized = normalizeDegrees(degrees);
+
+  const index =
+    Math.round(normalized / 22.5) % 16;
 
   return directions[index];
 }
 
-function calculateDestination(
-  latitude,
-  longitude,
-  bearingDegrees,
-  distanceKilometers
-) {
-  const earthRadiusKilometers = 6371;
-
-  const angularDistance =
-    distanceKilometers / earthRadiusKilometers;
-
-  const bearing = toRadians(bearingDegrees);
-  const startLatitude = toRadians(latitude);
-  const startLongitude = toRadians(longitude);
-
-  const destinationLatitude = Math.asin(
-    Math.sin(startLatitude) * Math.cos(angularDistance) +
-      Math.cos(startLatitude) *
-        Math.sin(angularDistance) *
-        Math.cos(bearing)
-  );
-
-  const destinationLongitude =
-    startLongitude +
-    Math.atan2(
-      Math.sin(bearing) *
-        Math.sin(angularDistance) *
-        Math.cos(startLatitude),
-      Math.cos(angularDistance) -
-        Math.sin(startLatitude) *
-          Math.sin(destinationLatitude)
-    );
-
-  return {
-    latitude: toDegrees(destinationLatitude),
-    longitude: normalizeLongitude(
-      toDegrees(destinationLongitude)
-    )
-  };
-}
-
-function toRadians(degrees) {
-  return (degrees * Math.PI) / 180;
-}
-
-function toDegrees(radians) {
-  return (radians * 180) / Math.PI;
-}
-
-function normalizeLongitude(longitude) {
-  return ((longitude + 540) % 360) - 180;
-}
-
-function getNearestTimeIndex(times, requestedDateTime) {
-  const requestedTimestamp = new Date(
-    requestedDateTime
-  ).getTime();
-
-  let nearestIndex = 0;
-  let nearestDifference = Infinity;
-
-  times.forEach((time, index) => {
-    const difference = Math.abs(
-      new Date(time).getTime() - requestedTimestamp
-    );
-
-    if (difference < nearestDifference) {
-      nearestDifference = difference;
-      nearestIndex = index;
-    }
-  });
-
-  return nearestIndex;
-}
-
-function formatForecastTime(value) {
-  const date = new Date(value);
-
-  return new Intl.DateTimeFormat("de-AT", {
-    dateStyle: "medium",
-    timeStyle: "short"
-  }).format(date);
-}
-
 /*
-  Ortssuche über Open-Meteo Geocoding
+  ============================================================
+  WINDTABELLE
+  ============================================================
 */
-
-async function searchLocation() {
-  const query = elements.locationInput.value.trim();
-
-  if (query.length < 2) {
-    setStatus(
-      "Bitte mindestens zwei Zeichen für die Ortssuche eingeben.",
-      "error"
-    );
-    return;
-  }
-
-  elements.searchButton.disabled = true;
-  elements.searchButton.textContent = "Suche...";
-  elements.searchResults.innerHTML = "";
-
-  setStatus("Ort wird gesucht...");
-
-  try {
-    const url = new URL(
-      "https://geocoding-api.open-meteo.com/v1/search"
-    );
-
-    url.searchParams.set("name", query);
-    url.searchParams.set("count", "8");
-    url.searchParams.set("language", "de");
-    url.searchParams.set("format", "json");
-
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(
-        `Ortssuche fehlgeschlagen: HTTP ${response.status}`
-      );
-    }
-
-    const data = await response.json();
-    const results = data.results || [];
-
-    if (results.length === 0) {
-      elements.searchResults.innerHTML = `
-        <p class="help-text">
-          Kein passender Ort gefunden.
-        </p>
-      `;
-
-      setStatus(
-        "Kein passender Ort gefunden.",
-        "error"
-      );
-
-      return;
-    }
-
-    renderSearchResults(results);
-
-    setStatus(
-      `${results.length} mögliche Orte gefunden.`,
-      "success"
-    );
-  } catch (error) {
-    console.error(error);
-
-    setStatus(
-      "Die Ortssuche konnte nicht geladen werden. Bitte später erneut versuchen.",
-      "error"
-    );
-  } finally {
-    elements.searchButton.disabled = false;
-    elements.searchButton.textContent = "Suchen";
-  }
-}
-
-function renderSearchResults(results) {
-  elements.searchResults.innerHTML = "";
-
-  results.forEach((result) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "search-result-button";
-
-    const locationParts = [
-      result.admin1,
-      result.country
-    ].filter(Boolean);
-
-    button.innerHTML = `
-      <strong>${escapeHtml(result.name)}</strong>
-      <span>${escapeHtml(locationParts.join(", "))}</span>
-    `;
-
-    button.addEventListener("click", () => {
-      const locationName = [
-        result.name,
-        result.admin1,
-        result.country
-      ]
-        .filter(Boolean)
-        .join(", ");
-
-      elements.locationInput.value = result.name;
-      elements.searchResults.innerHTML = "";
-
-      setLocation({
-        name: locationName,
-        latitude: result.latitude,
-        longitude: result.longitude
-      });
-    });
-
-    elements.searchResults.appendChild(button);
-  });
-}
-
-/*
-  Wetterdaten über Open-Meteo laden
-*/
-
-async function loadWeather() {
-  const date = elements.flightDate.value;
-  const time = elements.flightTime.value;
-
-  if (!date || !time) {
-    setStatus(
-      "Bitte Datum und Startzeit auswählen.",
-      "error"
-    );
-    return;
-  }
-
-  const requestedDateTime = `${date}T${time}`;
-
-  elements.loadWeatherButton.disabled = true;
-  elements.loadWeatherButton.textContent =
-    "Wetterdaten werden geladen...";
-
-  setStatus("Wetterprognose wird geladen...");
-
-  try {
-    const url = new URL(
-      "https://api.open-meteo.com/v1/forecast"
-    );
-
-    url.searchParams.set(
-      "latitude",
-      state.location.latitude
-    );
-
-    url.searchParams.set(
-      "longitude",
-      state.location.longitude
-    );
-
-    url.searchParams.set(
-      "hourly",
-      [
-        "temperature_2m",
-        "precipitation",
-        "cloud_cover",
-        "wind_speed_10m",
-        "wind_direction_10m",
-        "wind_speed_80m",
-        "wind_direction_80m",
-        "wind_speed_120m",
-        "wind_direction_120m",
-        "wind_speed_180m",
-        "wind_direction_180m"
-      ].join(",")
-    );
-
-    url.searchParams.set("timezone", "auto");
-    url.searchParams.set("wind_speed_unit", "kmh");
-    url.searchParams.set("start_date", date);
-    url.searchParams.set("end_date", date);
-
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(
-        `Wetterabfrage fehlgeschlagen: HTTP ${response.status}`
-      );
-    }
-
-    const data = await response.json();
-
-    if (!data.hourly || !data.hourly.time) {
-      throw new Error(
-        "Die Wetterantwort enthält keine stündlichen Daten."
-      );
-    }
-
-    const index = getNearestTimeIndex(
-      data.hourly.time,
-      requestedDateTime
-    );
-
-    const weather = createWeatherObject(
-      data,
-      index
-    );
-
-    state.weather = weather;
-
-    renderWeather(weather);
-    drawRoutes(weather);
-
-    setStatus(
-      "Wetterdaten erfolgreich geladen.",
-      "success"
-    );
-  } catch (error) {
-    console.error(error);
-
-    setStatus(
-      "Die Wetterdaten konnten nicht geladen werden. Das Datum liegt möglicherweise außerhalb des verfügbaren Vorhersagezeitraums.",
-      "error"
-    );
-  } finally {
-    elements.loadWeatherButton.disabled = false;
-    elements.loadWeatherButton.textContent =
-      "Wetterdaten laden";
-  }
-}
-
-function createWeatherObject(data, index) {
-  const hourly = data.hourly;
-
-  const winds = {};
-
-  HEIGHTS.forEach((height) => {
-    winds[height] = {
-      speed: Number(
-        hourly[`wind_speed_${height}m`][index]
-      ),
-      directionFrom: Number(
-        hourly[`wind_direction_${height}m`][index]
-      )
-    };
-  });
-
-  return {
-    forecastTime: hourly.time[index],
-    temperature: hourly.temperature_2m[index],
-    precipitation: hourly.precipitation[index],
-    cloudCover: hourly.cloud_cover[index],
-    winds
-  };
-}
-
-/*
-  Ergebnisse anzeigen
-*/
-
-function renderWeather(weather) {
-  const selectedHeight = Number(
-    elements.heightSelect.value
-  );
-
-  const selectedWind =
-    weather.winds[selectedHeight];
-
-  const travelDirection =
-    (selectedWind.directionFrom + 180) % 360;
-
-  const duration = Number(
-    elements.flightDuration.value
-  );
-
-  const distance =
-    selectedWind.speed * duration;
-
-  elements.weatherEmpty.classList.add("hidden");
-  elements.weatherContent.classList.remove("hidden");
-
-  elements.forecastTime.textContent =
-    formatForecastTime(weather.forecastTime);
-
-  elements.temperatureValue.textContent =
-    `${Number(weather.temperature).toFixed(1)} °C`;
-
-  elements.precipitationValue.textContent =
-    `${Number(weather.precipitation).toFixed(1)} mm`;
-
-  elements.cloudCoverValue.textContent =
-    `${Math.round(Number(weather.cloudCover))} %`;
-
-  elements.selectedHeightValue.textContent =
-    `${selectedHeight} m`;
-
-  elements.windSpeedValue.textContent =
-    `${selectedWind.speed.toFixed(1)} km/h`;
-
-  elements.windFromValue.textContent =
-    `${degreesToCompass(
-      selectedWind.directionFrom
-    )} (${Math.round(selectedWind.directionFrom)}°)`;
-
-  elements.travelDirectionValue.textContent =
-    `${degreesToCompass(
-      travelDirection
-    )} (${Math.round(travelDirection)}°)`;
-
-  elements.distanceValue.textContent =
-    `${distance.toFixed(1)} km`;
-
-  renderWindTable(weather);
-}
 
 function renderWindTable(weather) {
   elements.windTableBody.innerHTML = "";
 
-  HEIGHTS.forEach((height) => {
+  AVAILABLE_HEIGHTS.forEach(function (height) {
     const wind = weather.winds[height];
 
     const travelDirection =
-      (wind.directionFrom + 180) % 360;
+      normalizeDegrees(
+        wind.directionFrom + 180
+      );
 
     const row = document.createElement("tr");
 
@@ -635,14 +936,14 @@ function renderWindTable(weather) {
       </td>
 
       <td>
-        ${wind.speed.toFixed(1)} km/h
+        ${formatNumber(wind.speed, 1)} km/h
       </td>
 
-      <td>
+      <td title="${Math.round(wind.directionFrom)} Grad">
         ${degreesToCompass(wind.directionFrom)}
       </td>
 
-      <td>
+      <td title="${Math.round(travelDirection)} Grad">
         ${degreesToCompass(travelDirection)}
       </td>
     `;
@@ -652,41 +953,128 @@ function renderWindTable(weather) {
 }
 
 /*
-  Routen zeichnen
+  ============================================================
+  ZIELKOORDINATEN BERECHNEN
+  ============================================================
+*/
+
+function calculateDestination(
+  startLatitude,
+  startLongitude,
+  bearingDegrees,
+  distanceKilometers
+) {
+  const earthRadiusKilometers = 6371;
+
+  const angularDistance =
+    distanceKilometers / earthRadiusKilometers;
+
+  const bearing = toRadians(bearingDegrees);
+  const latitude1 = toRadians(startLatitude);
+  const longitude1 = toRadians(startLongitude);
+
+  const latitude2 = Math.asin(
+    Math.sin(latitude1) *
+      Math.cos(angularDistance) +
+    Math.cos(latitude1) *
+      Math.sin(angularDistance) *
+      Math.cos(bearing)
+  );
+
+  const longitude2 =
+    longitude1 +
+    Math.atan2(
+      Math.sin(bearing) *
+        Math.sin(angularDistance) *
+        Math.cos(latitude1),
+
+      Math.cos(angularDistance) -
+        Math.sin(latitude1) *
+          Math.sin(latitude2)
+    );
+
+  return {
+    latitude: toDegrees(latitude2),
+    longitude: normalizeLongitude(
+      toDegrees(longitude2)
+    )
+  };
+}
+
+function toRadians(degrees) {
+  return degrees * Math.PI / 180;
+}
+
+function toDegrees(radians) {
+  return radians * 180 / Math.PI;
+}
+
+function normalizeLongitude(longitude) {
+  return ((longitude + 540) % 360) - 180;
+}
+
+/*
+  ============================================================
+  ROUTEN VON DER KARTE ENTFERNEN
+  ============================================================
 */
 
 function clearRoutes() {
-  state.routeLayers.forEach((layer) => {
+  if (!map) {
+    return;
+  }
+
+  state.routeLayers.forEach(function (layer) {
     map.removeLayer(layer);
   });
 
-  state.endMarkers.forEach((marker) => {
-    map.removeLayer(marker);
-  });
+  state.destinationMarkers.forEach(
+    function (marker) {
+      map.removeLayer(marker);
+    }
+  );
 
   state.routeLayers = [];
-  state.endMarkers = [];
+  state.destinationMarkers = [];
 }
 
+/*
+  ============================================================
+  ROUTEN ZEICHNEN
+  ============================================================
+*/
+
 function drawRoutes(weather) {
+  if (!map) {
+    return;
+  }
+
   clearRoutes();
 
   const duration = Number(
     elements.flightDuration.value
   );
 
+  const selectedHeight = Number(
+    elements.heightSelect.value
+  );
+
+  const startCoordinates = [
+    state.location.latitude,
+    state.location.longitude
+  ];
+
   const bounds = L.latLngBounds([
-    [
-      state.location.latitude,
-      state.location.longitude
-    ]
+    startCoordinates
   ]);
 
-  HEIGHTS.forEach((height) => {
+  AVAILABLE_HEIGHTS.forEach(function (height) {
     const wind = weather.winds[height];
 
     const travelDirection =
-      (wind.directionFrom + 180) % 360;
+      normalizeDegrees(
+        wind.directionFrom + 180
+      );
 
     const distance =
       wind.speed * duration;
@@ -698,164 +1086,268 @@ function drawRoutes(weather) {
       distance
     );
 
-    const line = L.polyline(
+    const destinationCoordinates = [
+      destination.latitude,
+      destination.longitude
+    ];
+
+    const isSelected =
+      selectedHeight === height;
+
+    const routeLine = L.polyline(
       [
-        [
-          state.location.latitude,
-          state.location.longitude
-        ],
-        [
-          destination.latitude,
-          destination.longitude
-        ]
+        startCoordinates,
+        destinationCoordinates
       ],
       {
         color: ROUTE_COLORS[height],
-        weight: 5,
-        opacity: 0.9,
-        dashArray:
-          Number(elements.heightSelect.value) === height
-            ? null
-            : "9 8"
+        weight: isSelected ? 6 : 4,
+        opacity: isSelected ? 1 : 0.78,
+        dashArray: isSelected ? null : "10 9",
+        lineCap: "round",
+        lineJoin: "round"
       }
     ).addTo(map);
 
-    line.bindPopup(`
-      <strong>${height} m Windhöhe</strong><br>
-      Wind: ${wind.speed.toFixed(1)} km/h<br>
-      Wind aus: ${degreesToCompass(
-        wind.directionFrom
-      )} (${Math.round(wind.directionFrom)}°)<br>
-      Fahrt nach: ${degreesToCompass(
-        travelDirection
-      )} (${Math.round(travelDirection)}°)<br>
-      Vereinfachte Strecke: ${distance.toFixed(1)} km
+    routeLine.bindPopup(`
+      <div style="min-width:210px">
+        <strong style="color:${ROUTE_COLORS[height]}">
+          🎈 Route bei ${height} m Windhöhe
+        </strong>
+
+        <br><br>
+
+        <strong>Wind:</strong>
+        ${formatNumber(wind.speed, 1)} km/h
+
+        <br>
+
+        <strong>Wind kommt aus:</strong>
+        ${degreesToCompass(wind.directionFrom)}
+        (${Math.round(wind.directionFrom)}°)
+
+        <br>
+
+        <strong>Fahrt ungefähr nach:</strong>
+        ${degreesToCompass(travelDirection)}
+        (${Math.round(travelDirection)}°)
+
+        <br>
+
+        <strong>Vereinfachte Strecke:</strong>
+        ${formatNumber(distance, 1)} km
+      </div>
     `);
 
-    const endMarker = L.circleMarker(
-      [
-        destination.latitude,
-        destination.longitude
-      ],
+    const destinationMarker = L.circleMarker(
+      destinationCoordinates,
       {
-        radius:
-          Number(elements.heightSelect.value) === height
-            ? 9
-            : 7,
+        radius: isSelected ? 10 : 7,
         color: "#ffffff",
-        weight: 2,
+        weight: isSelected ? 3 : 2,
         fillColor: ROUTE_COLORS[height],
         fillOpacity: 1
       }
     ).addTo(map);
 
-    endMarker.bindPopup(`
-      <strong>Rechnerischer Endpunkt</strong><br>
-      Windhöhe: ${height} m<br>
-      Strecke: ${distance.toFixed(1)} km<br>
-      Koordinaten:<br>
-      ${destination.latitude.toFixed(5)},
-      ${destination.longitude.toFixed(5)}
+    destinationMarker.bindPopup(`
+      <div style="min-width:210px">
+        <strong>
+          Rechnerischer Endpunkt
+        </strong>
+
+        <br><br>
+
+        <strong>Windhöhe:</strong>
+        ${height} m
+
+        <br>
+
+        <strong>Strecke:</strong>
+        ${formatNumber(distance, 1)} km
+
+        <br>
+
+        <strong>Koordinaten:</strong>
+        <br>
+        ${destination.latitude.toFixed(5)},
+        ${destination.longitude.toFixed(5)}
+
+        <br><br>
+
+        <small>
+          Dieser Punkt ist keine tatsächliche
+          Landeprognose.
+        </small>
+      </div>
     `);
 
-    state.routeLayers.push(line);
-    state.endMarkers.push(endMarker);
+    state.routeLayers.push(routeLine);
+    state.destinationMarkers.push(
+      destinationMarker
+    );
 
-    bounds.extend([
-      destination.latitude,
-      destination.longitude
-    ]);
+    bounds.extend(destinationCoordinates);
   });
 
   if (bounds.isValid()) {
     map.fitBounds(bounds, {
-      padding: [50, 50],
+      paddingTopLeft: [55, 55],
+      paddingBottomRight: [55, 55],
       maxZoom: 12
     });
   }
 }
 
 /*
-  Ereignisse
+  ============================================================
+  SCHIEBEREGLER OPTISCH AKTUALISIEREN
+  ============================================================
 */
 
-elements.searchButton.addEventListener(
-  "click",
-  searchLocation
-);
+function updateDurationSlider() {
+  const slider = elements.flightDuration;
 
-elements.locationInput.addEventListener(
-  "keydown",
-  (event) => {
-    if (event.key === "Enter") {
-      searchLocation();
-    }
+  if (!slider) {
+    return;
   }
-);
 
-elements.flightDuration.addEventListener(
-  "input",
-  () => {
-    elements.durationValue.textContent =
-      elements.flightDuration.value;
+  const value = Number(slider.value);
+  const minimum = Number(slider.min);
+  const maximum = Number(slider.max);
 
-    if (state.weather) {
-      renderWeather(state.weather);
-      drawRoutes(state.weather);
-    }
-  }
-);
+  const percentage =
+    ((value - minimum) / (maximum - minimum)) *
+    100;
 
-elements.heightSelect.addEventListener(
-  "change",
-  () => {
-    if (state.weather) {
-      renderWeather(state.weather);
-      drawRoutes(state.weather);
-    }
-  }
-);
+  slider.style.background = `
+    linear-gradient(
+      90deg,
+      #169cff 0%,
+      #169cff ${percentage}%,
+      rgba(126, 163, 193, 0.25) ${percentage}%,
+      rgba(126, 163, 193, 0.25) 100%
+    )
+  `;
 
-elements.loadWeatherButton.addEventListener(
-  "click",
-  loadWeather
-);
-
-map.on("click", (event) => {
-  elements.locationInput.value = "";
-
-  setLocation(
-    {
-      name: "Ausgewählter Kartenpunkt",
-      latitude: event.latlng.lat,
-      longitude: event.latlng.lng
-    },
-    map.getZoom()
-  );
-});
-
-startMarker.on("dragend", () => {
-  const coordinates = startMarker.getLatLng();
-
-  elements.locationInput.value = "";
-
-  setLocation(
-    {
-      name: "Verschobener Startpunkt",
-      latitude: coordinates.lat,
-      longitude: coordinates.lng
-    },
-    map.getZoom()
-  );
-});
+  elements.durationValue.textContent =
+    formatNumber(value, 2)
+      .replace(",00", "")
+      .replace(/0$/, "");
+}
 
 /*
-  App starten
+  ============================================================
+  EREIGNISSE
+  ============================================================
 */
 
-setDefaultDateToNextSunday();
-updateLocationDisplay();
+function registerEventListeners() {
+  elements.searchButton.addEventListener(
+    "click",
+    searchLocation
+  );
 
-setTimeout(() => {
-  map.invalidateSize();
-}, 250);
+  elements.locationInput.addEventListener(
+    "keydown",
+    function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        searchLocation();
+      }
+    }
+  );
+
+  elements.locationInput.addEventListener(
+    "input",
+    function () {
+      if (
+        elements.locationInput.value.trim() === ""
+      ) {
+        elements.searchResults.innerHTML = "";
+      }
+    }
+  );
+
+  elements.loadWeatherButton.addEventListener(
+    "click",
+    loadWeather
+  );
+
+  elements.flightDuration.addEventListener(
+    "input",
+    function () {
+      updateDurationSlider();
+
+      if (state.weather) {
+        renderWeather(state.weather);
+        renderWindTable(state.weather);
+        drawRoutes(state.weather);
+      }
+    }
+  );
+
+  elements.heightSelect.addEventListener(
+    "change",
+    function () {
+      if (state.weather) {
+        renderWeather(state.weather);
+        renderWindTable(state.weather);
+        drawRoutes(state.weather);
+      }
+    }
+  );
+
+  elements.flightDate.addEventListener(
+    "change",
+    function () {
+      clearRoutes();
+      resetWeatherDisplay();
+
+      setStatus(
+        "Datum geändert. Bitte Wetterdaten neu laden."
+      );
+    }
+  );
+
+  elements.flightTime.addEventListener(
+    "change",
+    function () {
+      clearRoutes();
+      resetWeatherDisplay();
+
+      setStatus(
+        "Startzeit geändert. Bitte Wetterdaten neu laden."
+      );
+    }
+  );
+
+  window.addEventListener("resize", function () {
+    if (map) {
+      map.invalidateSize();
+    }
+  });
+}
+
+/*
+  ============================================================
+  APP STARTEN
+  ============================================================
+*/
+
+function initializeApplication() {
+  setDefaultFlightDate();
+  updateLocationDisplay();
+  updateDurationSlider();
+  initializeMap();
+  registerEventListeners();
+
+  setStatus(
+    "Startort auswählen und anschließend Wetterdaten laden."
+  );
+}
+
+document.addEventListener(
+  "DOMContentLoaded",
+  initializeApplication
+);
