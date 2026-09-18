@@ -53,10 +53,11 @@ durationRange.addEventListener('input', (e) => {
     durationVal.textContent = parseFloat(e.target.value).toFixed(1) + " Stunden";
 });
 
-// Automatisches Vorbefüllen des heutigen Datums
+// KORRIGIERT: Sicheres Vorbefüllen des heutigen Datums ohne Array-Crash
 const dateInput = document.getElementById('date');
 if (dateInput) {
-    dateInput.value = new Date().toISOString().split('T')[0];
+    const todayParts = new Date().toISOString().split('T');
+    dateInput.value = todayParts[0];
 }
 
 // Logik für Schnellauswahl-Buttons
