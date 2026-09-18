@@ -14,9 +14,10 @@
   <!-- Leaflet CSS mit EXAKTEM Subresource-Integrity Hash gegen Browser-Blockaden -->
 <link
   rel="stylesheet"
-  href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
-  integrity="sha512-h9fXgXV7HhtM9LFzNf2P6KyHR+Y6SY+4PSJVpaz6RtWLpmjHtkobaN6D+PfYZ7RUTpujISiFDUFxIr05o2Ia4A=="
-/>
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""
+>
 
   <!-- Bindet Ihr lokales Stylesheet ein -->
   <link rel="stylesheet" href="./style.css">
@@ -186,14 +187,12 @@
 
   </main>
 
-  <!-- Leaflet JavaScript mit verifiziertem SRI-Schlüssel -->
 <script
-  src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"
-  integrity="sha512-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo+W2gMtjD5Qj6p6J0l3mC5QjK5Qxj2r0u7jQ2l7Jm2Og=="
-  crossorigin
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
 ></script>
 
-  <!-- Ihre eigene JavaScript-Anwendungslogik -->
-  <script src="./app.js"></script>
+<script src="./app.js"></script>
 </body>
 </html>
