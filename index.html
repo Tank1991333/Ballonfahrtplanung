@@ -36,7 +36,7 @@
         <div class="section-title"><div class="step">1</div><h2>Startort auswählen</h2></div>
         <p class="hint">Ort oder Postleitzahl in Österreich eingeben:</p>
         <div class="search-row">
-          <input id="search-location" type="search" value="Bad Waltersdorf" placeholder="z. B. Hartberg" autocomplete="off">
+          <input id="search-location" type="search" value="Bad Waltersdorf" placeholder="z. B. Hartberg" autocomplete="off" aria-label="Ort oder Postleitzahl in Österreich">
           <button id="search-button" type="button">Suchen</button>
         </div>
         <p class="hint location-hint">Der Startpunkt kann auch direkt auf der Karte angeklickt oder durch Verschieben des Markers geändert werden.</p>
@@ -67,14 +67,14 @@
         </div>
       </section>
 
-<div class="info-box">
-  <strong>Wichtiger Hinweis</strong><br>
-  Die verwendeten Winddaten stammen aus dem DWD ICON-D2 Wettermodell.
-  Die berechneten Trajektorien basieren auf den vorhergesagten Windfeldern
-  zum gewählten Zeitpunkt und für die ausgewählten Höhen.
-  Tatsächliche Ballonfahrten können durch lokale Wettereffekte,
-  Thermik, Gelände und kurzfristige Wetteränderungen abweichen.
-</div>
+<section class="card information-card">
+        <span class="information-icon" aria-hidden="true">ℹ️</span>
+        <div>
+          <strong>Wichtiger Hinweis</strong>
+          <p>Aktuell werden simulierte Beispieldaten verwendet, keine echten Winddaten. Eine Anbindung an das DWD-Wettermodell ICON-D2 ist noch nicht umgesetzt. Datum und Startzeit haben derzeit keinen Einfluss auf die Berechnung.</p>
+          <p>Die Routen sind keine Flugprognose und nicht für die Flugplanung geeignet.</p>
+        </div>
+      </section>
     </aside>
 
     <aside class="results-column">
@@ -102,13 +102,13 @@
     </aside>
 
     <section class="map-panel">
-      <div id="map" aria-label="Interaktive Karte für die Ballonfahrt-Simulation"><div class="map-fallback">Karte wird geladen...</div></div>
-      <div class="map-message"><span class="status-dot"></span><div><span class="map-status-title">Systemstatus</span><small>Karte geladen</small></div></div>
+      <div id="map" role="region" aria-label="Interaktive Karte für die Ballonfahrt-Simulation"><div class="map-fallback">Karte wird geladen...</div></div>
+      <div id="map-message" class="map-message"><span class="status-dot"></span><div><span class="map-status-title">Systemstatus</span><small id="map-status-text">Karte wird geladen...</small></div></div>
       <div class="map-legend">
         <strong>Kartenanzeige</strong>
         <div class="legend-entry"><span class="legend-symbol legend-start"></span>Startplatz</div>
-        <div class="legend-entry"><span class="legend-symbol legend-route"></span>Simulierte Route</div>
-        <div class="legend-entry"><span class="legend-symbol legend-end"></span>Simulierter Endpunkt</div>
+        <div class="legend-entry"><span class="legend-symbol legend-route"></span>Simulierte Route (Farbe je Höhe)</div>
+        <div class="legend-entry"><span class="legend-symbol legend-end"></span>Simulierter Endpunkt (Farbe je Höhe)</div>
       </div>
     </section>
   </main>
