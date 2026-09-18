@@ -1,9 +1,22 @@
 "use strict";
 
-// Open-Meteo stellt diese ICON-D2-Windhöhen zuverlässig als Standardvariablen bereit.
-const heights = [10, 80, 120, 180];
-const colors = ["#1570a6", "#0b8b57", "#ea7d24", "#8b5cf6"];
+const heightDefinitions = [
+  { height: 10, model: "icon_d2", sourceLabel: "ICON-D2" },
+  { height: 80, model: "icon_d2", sourceLabel: "ICON-D2" },
+  { height: 120, model: "icon_d2", sourceLabel: "ICON-D2" },
+  { height: 180, model: "icon_d2", sourceLabel: "ICON-D2" },
+  { height: 300, model: "gfs", sourceLabel: "GFS (925 hPa)", level: "925hPa" },
+  { height: 500, model: "gfs", sourceLabel: "GFS (925 hPa)", level: "925hPa" },
+  { height: 800, model: "gfs", sourceLabel: "GFS (850 hPa)", level: "850hPa" },
+  { height: 1000, model: "gfs", sourceLabel: "GFS (850 hPa)", level: "850hPa" },
+  { height: 1500, model: "gfs", sourceLabel: "GFS (850 hPa)", level: "850hPa" },
+  { height: 2000, model: "gfs", sourceLabel: "GFS (700 hPa)", level: "700hPa" },
+  { height: 3000, model: "gfs", sourceLabel: "GFS (500 hPa)", level: "500hPa" }
+];
+const heights = heightDefinitions.map((entry) => entry.height);
 const selectedDefaults = [10, 80, 120, 180];
+const colors = ["#1570a6", "#0b8b57", "#ea7d24", "#8b5cf6", "#dc2626", "#0891b2", "#ca8a04", "#db2777", "#4f46e5", "#059669", "#d97706"];
+const heightByValue = new Map(heightDefinitions.map((entry) => [entry.height, entry]));
 
 const $ = (id) => document.getElementById(id);
 const latInput = $("lat");
@@ -157,14 +170,45 @@ function readInterpolatedHourlyValue(data, variable, timestamp) {
   return Math.max(0, lower + (upper - lower) * ratio);
 }
 
-async function loadIconD2(latitude, longitude) {
-  const variables = heights.flatMap((height) => [`wind_speed_${height}m`, `wind_direction_${height}m`]).join(",");
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=${variables}&models=icon_d2&forecast_days=2&timezone=UTC`;
+function getForecastVariableName(definition, type) {
+  if (definition.model === "icon_d2") {
+    return `${type}_${definition.height}m`;
+  }
+  return `${type}_${definition.level}`;
+}
+
+async function loadForecastForModel(model, latitude, longitude, variables) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=${variables.join(",")}&models=${model}&forecast_days=2&timezone=UTC`;
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`ICON-D2-Abfrage fehlgeschlagen (${response.status})`);
+  if (!response.ok) throw new Error(`Wetterdaten (${model}) konnten nicht geladen werden (${response.status}).`);
   const data = await response.json();
-  if (!data.hourly || !Array.isArray(data.hourly.time)) throw new Error("Die ICON-D2-Antwort ist unvollständig.");
+  if (!data.hourly || !Array.isArray(data.hourly.time)) throw new Error(`Die ${model}-Antwort ist unvollständig.`);
   return data;
+}
+
+async function loadWeatherForSelection(latitude, longitude, selectedHeights) {
+  const requirementsByModel = new Map();
+
+  selectedHeights.forEach((height) => {
+    const definition = heightByValue.get(height);
+    if (!definition) return;
+    if (!requirementsByModel.has(definition.model)) {
+      requirementsByModel.set(definition.model, []);
+    }
+    const variableSet = requirementsByModel.get(definition.model);
+    variableSet.push(getForecastVariableName(definition, "wind_speed"));
+    variableSet.push(getForecastVariableName(definition, "wind_direction"));
+  });
+
+  const forecastMap = new Map();
+  const work = Array.from(requirementsByModel.entries()).map(async ([model, variables]) => {
+    const uniqueVariables = [...new Set(variables)];
+    const forecast = await loadForecastForModel(model, latitude, longitude, uniqueVariables);
+    forecastMap.set(model, forecast);
+  });
+
+  await Promise.all(work);
+  return forecastMap;
 }
 
 async function searchLocation() {
@@ -190,7 +234,7 @@ async function searchLocation() {
   }
 }
 
-function buildTrajectory(height, latitude, longitude, startTimestamp, durationHours, forecast) {
+function buildTrajectory(height, latitude, longitude, startTimestamp, durationHours, forecast, model, level) {
   const points = [[latitude, longitude]];
   const stepSeconds = 15 * 60;
   const steps = Math.max(1, Math.ceil((durationHours * 3600) / stepSeconds));
@@ -198,8 +242,10 @@ function buildTrajectory(height, latitude, longitude, startTimestamp, durationHo
 
   for (let step = 1; step <= steps; step += 1) {
     const timestamp = startTimestamp + step * stepSeconds * 1000;
-    const speed = readInterpolatedHourlyValue(forecast, `wind_speed_${height}m`, timestamp);
-    const direction = readInterpolatedHourlyValue(forecast, `wind_direction_${height}m`, timestamp);
+    const variableName = model === "icon_d2" ? `wind_speed_${height}m` : `wind_speed_${level}`;
+    const directionName = model === "icon_d2" ? `wind_direction_${height}m` : `wind_direction_${level}`;
+    const speed = readInterpolatedHourlyValue(forecast, variableName, timestamp);
+    const direction = readInterpolatedHourlyValue(forecast, directionName, timestamp);
     current = movePosition(current, speed, direction, stepSeconds);
     points.push(current);
   }
@@ -217,11 +263,11 @@ async function runSimulation() {
 
   clearSimulation();
   runButton.disabled = true;
-  runButton.textContent = "ICON-D2 wird geladen...";
-  setStatus("Winddaten aus dem ICON-D2-Modell werden geladen...", "loading");
+  runButton.textContent = "Wetterdaten werden geladen...";
+  setStatus("Winddaten werden geladen...", "loading");
 
   try {
-    const forecast = await loadIconD2(latitude, longitude);
+    const forecastMap = await loadWeatherForSelection(latitude, longitude, selected);
     const startTimestamp = Date.parse(`${dateInput.value}T${startInput.value || "07:00"}:00Z`);
     if (!Number.isFinite(startTimestamp)) throw new Error("Datum oder Startzeit ist ungültig.");
 
@@ -229,24 +275,29 @@ async function runSimulation() {
     let rows = "";
 
     selected.forEach((height) => {
-      const points = buildTrajectory(height, latitude, longitude, startTimestamp, duration, forecast);
+      const definition = heightByValue.get(height);
+      if (!definition) return;
+      const forecast = forecastMap.get(definition.model);
+      const points = buildTrajectory(height, latitude, longitude, startTimestamp, duration, forecast, definition.model, definition.level || `${height}m`);
       const color = colors[heights.indexOf(height)] || colors[0];
       const end = points[points.length - 1];
       const endTimestamp = startTimestamp + (points.length - 1) * 15 * 60 * 1000;
-      const endSpeed = readInterpolatedHourlyValue(forecast, `wind_speed_${height}m`, endTimestamp);
-      const endDirection = readInterpolatedHourlyValue(forecast, `wind_direction_${height}m`, endTimestamp);
-      const line = L.polyline(points, { color, weight: 4, opacity: 0.82, bubblingMouseEvents: false }).addTo(map).bindPopup(`<b>ICON-D2-Windroute</b><br>${formatAltitude(height)}`);
+      const speedName = getForecastVariableName(definition, "wind_speed");
+      const directionName = getForecastVariableName(definition, "wind_direction");
+      const endSpeed = readInterpolatedHourlyValue(forecast, speedName, endTimestamp);
+      const endDirection = readInterpolatedHourlyValue(forecast, directionName, endTimestamp);
+      const line = L.polyline(points, { color, weight: 4, opacity: 0.82, bubblingMouseEvents: false }).addTo(map).bindPopup(`<b>Windroute</b><br>${formatAltitude(height)}<br>${definition.sourceLabel}`);
       const marker = L.circleMarker(end, { radius: 7, fillColor: color, color: "#fff", weight: 2, fillOpacity: 1, bubblingMouseEvents: false }).addTo(map);
 
       simulationLayers.push(line, marker);
       allPoints.push(...points);
-      rows += `<tr><td><span class="result-color" style="background:${color}"></span>${formatAltitude(height)}</td><td>${formatWindDirection(endDirection)}</td><td>${formatWindSpeed(endSpeed)}</td><td>${calculateDistance([latitude, longitude], end).toFixed(2)} km</td></tr>`;
+      rows += `<tr><td><span class="result-color" style="background:${color}"></span>${formatAltitude(height)}</td><td>${definition.sourceLabel}</td><td>${formatWindDirection(endDirection)}</td><td>${formatWindSpeed(endSpeed)}</td><td>${calculateDistance([latitude, longitude], end).toFixed(2)} km</td></tr>`;
     });
 
-    resultsContainer.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Höhe</th><th>Windrichtung</th><th>Windgeschwindigkeit</th><th>Entfernung</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    resultsContainer.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Höhe</th><th>Modell</th><th>Windrichtung</th><th>Windgeschwindigkeit</th><th>Entfernung</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     const bounds = L.latLngBounds(allPoints);
     if (bounds.isValid()) map.fitBounds(bounds.pad(0.12), { maxZoom: 13 });
-    setStatus(`${selected.length} ICON-D2-Trajektorien wurden berechnet.`, "success");
+    setStatus(`${selected.length} Trajektorien wurden berechnet.`, "success");
   } catch (error) {
     clearSimulation();
     resultsContainer.innerHTML = emptyResultsHtml;
