@@ -1,82 +1,396 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
 
-    <title>Windy Ballonplaner</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
-    <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    >
+  <meta
+    name="description"
+    content="Ballonfahrt-Planer mit freier Startortwahl, Wetterdaten und vereinfachter Driftberechnung."
+  >
 
-    style.css
+  <title>Balloon Flight Planner</title>
+
+  https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
+
+  <link rel="stylesheet" href="./styles.css">
 </head>
 
 <body>
+  <header class="hero">
+    <div class="hero-shade"></div>
 
-<header>
-    <div>
-        <b>Windy Ballonplaner</b>
-        <span>Trajektorien nach Wettermodell und Höhe</span>
+    <div class="hero-content">
+      <div class="brand">
+        <div class="balloon-logo" aria-hidden="true">   <p class="eyebrow">Wetterbasierte Planungshilfe</p>
+          <h1>Balloon Flight Planner</h1>
+
+          <p class="hero-text">
+            Startort auswählen, Wetterdaten laden und eine
+            vereinfachte Fahrtrichtung berechnen.
+          </p>
+        </div>
+      </div>
+
+      <div class="version-badge">
+        <span>✓</span>
+        Kostenlose Privatversion
+      </div>
     </div>
-</header>
+  </header>
 
-<main>
+  <main class="app-shell">
+    <aside class="sidebar">
+      <section class="card">
+        <div class="card-heading">
+          <span class="step">1</span>
 
-    <aside>
-
-        <div class="warn">
-            <b>Hinweis</b><br>
-            Nur als Planungshilfe verwenden.
+          <div>
+            <p class="small-title">Startpunkt</p>
+            <h2>Startort auswählen</h2>
+          </div>
         </div>
 
-        <label>Breitengrad</label>
-        <input id="lat" type="number" step="0.0001" value="47.2810">
+        <label for="locationInput">
+          Ort oder Postleitzahl
+        </label>
 
-        <label>Längengrad</label>
-        <input id="lon" type="number" step="0.0001" value="15.9700">
+        <div class="search-row">
+          <input
+            id="locationInput"
+            type="search"
+            value="Bad Waltersdorf"
+            placeholder="Ort eingeben"
+            autocomplete="off"
+          >
 
-        <label>Startzeit</label>
-        <input id="start" type="datetime-local">
+          <button id="searchButton" type="button">
+            Suchen
+          </button>
+        </div>
 
-        <label>Flugdauer (Stunden)</label>
-        <input
-            id="duration"
-            type="number"
+        <div
+          id="searchResults"
+          class="search-results"
+          aria-live="polite"
+        ></div>
+
+        <p class="help-text">
+          Du kannst auch direkt auf die Karte klicken oder
+          den blauen Startmarker verschieben.
+        </p>
+
+        <div class="location-box">
+          <span class="location-icon" aria-hidden="true">●</span>
+
+          <div>
+            <strong id="selectedLocationName">
+              Bad Waltersdorf
+            </strong>
+
+            <div class="coordinates">
+              <span>
+                Breitengrad
+                <b id="latitudeValue">47.16960</b>
+              </span>
+
+              <span>
+                Längengrad
+                <b id="longitudeValue">16.00930</b>
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-heading">
+          <span class="step">2</span>
+
+          <div>
+            <p class="small-title">Einstellungen</p>
+            <h2>Fahrtdaten einstellen</h2>
+          </div>
+        </div>
+
+        <div class="field-grid">
+          <div class="form-group">
+            <label for="flightDate">Datum</label>
+            <input id="flightDate" type="date">
+          </div>
+
+          <div class="form-group">
+            <label for="flightTime">Startzeit</label>
+            <input id="flightTime" type="time" value="07:00">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="range-title">
+            <label for="flightDuration">Flugdauer</label>
+
+            <strong>
+              <span id="durationValue">1,5</span> Stunden
+            </strong>
+          </div>
+
+          <input
+            id="flightDuration"
+            type="range"
             min="0.5"
-            max="12"
-            step="0.5"
-            value="2"
+            max="3"
+            step="0.25"
+            value="1.5"
+          >
+
+          <div class="range-labels">
+            <span>0,5 h</span>
+            <span>1 h</span>
+            <span>1,5 h</span>
+            <span>2 h</span>
+            <span>3 h</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="heightSelect">
+            Verwendete Windhöhe
+          </label>
+
+          <select id="heightSelect">
+            <option value="10">10 m über Grund</option>
+            <option value="80">80 m über Grund</option>
+            <option value="120">120 m über Grund</option>
+            <option value="180" selected>
+              180 m über Grund
+            </option>
+          </select>
+        </div>
+
+        <button
+          id="loadWeatherButton"
+          class="primary-button"
+          type="button"
         >
-
-        <label>Wettermodell</label>
-        <select id="model">
-            <option value="iconD2">ICON-D2</option>
-            <option value="iconEu">ICON-EU</option>
-            <option value="icon">ICON Global</option>
-            <option value="gfs">GFS</option>
-        </select>
-
-        <label>Höhen auswählen</label>
-        <div id="levels"></div>
-
-        <button id="run">
-            Trajektorien berechnen
+          Wetterdaten laden
         </button>
 
-        <div id="status"></div>
-        <div id="results"></div>
+        <p id="statusMessage" class="status-message">
+          Startort auswählen und Wetterdaten laden.
+        </p>
+      </section>
 
+      <section class="card">
+        <div class="card-heading">
+          <span class="step">3</span>
+
+          <div>
+            <p class="small-title">Ergebnis</p>
+            <h2>Wetterdaten</h2>
+          </div>
+        </div>
+
+        <div id="weatherEmpty" class="empty-state">
+          <span class="weather-symbol">☁</span>
+
+          <div>
+            <strong>Noch keine Wetterdaten geladen</strong>
+            <p>Lade die Prognose für den gewählten Startpunkt.</p>
+          </div>
+        </div>
+
+        <div id="weatherContent" class="hidden">
+          <div class="weather-grid">
+            <div class="value-box">
+              <span>Prognosezeit</span>
+              <strong id="forecastTime">–</strong>
+            </div>
+
+            <div class="value-box">
+              <span>Temperatur</span>
+              <strong id="temperatureValue">–</strong>
+            </div>
+
+            <div class="value-box">
+              <span>Niederschlag</span>
+              <strong id="precipitationValue">–</strong>
+            </div>
+
+            <div class="value-box">
+              <span>Bewölkung</span>
+              <strong id="cloudCoverValue">–</strong>
+            </div>
+          </div>
+
+          <div class="result-row">
+            <span>Gewählte Windhöhe</span>
+            <strong id="selectedHeightValue">–</strong>
+          </div>
+
+          <div class="result-row">
+            <span>Windgeschwindigkeit</span>
+            <strong id="windSpeedValue">–</strong>
+          </div>
+
+          <div class="result-row">
+            <span>Wind kommt aus</span>
+            <strong id="windFromValue">–</strong>
+          </div>
+
+          <div class="result-row">
+            <span>Fahrt ungefähr nach</span>
+            <strong id="travelDirectionValue">–</strong>
+          </div>
+
+          <div class="distance-box">
+            <span>Vereinfachte Fahrstrecke</span>
+            <strong id="distanceValue">–</strong>
+          </div>
+        </div>
+      </section>
     </aside>
 
-    <section id="map"></section>
+    <section class="content-column">
+      <section class="card forecast-card">
+        <div class="forecast-heading">
+          <div>
+            <p class="small-title">Übersicht</p>
+            <h2>Aktuelle Prognose</h2>
+          </div>
 
-</main>
+          <span class="forecast-badge">
+            <i></i>
+            Prognose
+          </span>
+        </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/script>
-<script src="app.js"></script>
+        <div class="forecast-list">
+          <div>
+            <span>Prognosezeit</span>
+            <strong id="forecastTimeMirror">–</strong>
+          </div>
 
+          <div>
+            <span>Temperatur</span>
+            <strong id="temperatureMirror">–</strong>
+          </div>
+
+          <div>
+            <span>Niederschlag</span>
+            <strong id="precipitationMirror">–</strong>
+          </div>
+
+          <div>
+            <span>Bewölkung</span>
+            <strong id="cloudCoverMirror">–</strong>
+          </div>
+
+          <div>
+            <span>Windgeschwindigkeit</span>
+            <strong id="windSpeedMirror">–</strong>
+          </div>
+
+          <div>
+            <span>Fahrtrichtung</span>
+            <strong id="travelDirectionMirror">–</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="forecast-heading">
+          <div>
+            <p class="small-title">Höhenvergleich</p>
+            <h2>Wind nach Höhe</h2>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Höhe</th>
+                <th>Wind</th>
+                <th>Aus</th>
+                <th>Fahrt nach</th>
+              </tr>
+            </thead>
+
+            <tbody id="windTableBody">
+              <tr>
+                <td colspan="4" class="no-data">
+                  Noch keine Daten
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="height-list">
+          <span><i class="color-10"></i>10 m</span>
+          <span><i class="color-80"></i>80 m</span>
+          <span><i class="color-120"></i>120 m</span>
+          <span><i class="color-180"></i>180 m</span>
+        </div>
+      </section>
+    </section>
+
+    <section class="map-panel">
+      <div id="map"></div>
+
+      <div class="map-caption">
+        <span class="caption-icon">⌖</span>
+
+        <div>
+          <span>Ausgewählter Startpunkt</span>
+          <strong>Route und mögliche Endpunkte</strong>
+        </div>
+      </div>
+
+      <div class="legend">
+        <h3>Legende</h3>
+
+        <div><span>10 m</span><i class="line-10"></i></div>
+        <div><span>80 m</span><i class="line-80"></i></div>
+        <div><span>120 m</span><i class="line-120"></i></div>
+        <div><span>180 m</span><i class="line-180"></i></div>
+
+        <p><b></b>Startpunkt</p>
+      </div>
+    </section>
+  </main>
+
+  <section class="warning">
+    <div class="warning-icon">✓</div>
+
+    <div>
+      <h2>Wichtiger Hinweis</h2>
+
+      <p>
+        Dieses Werkzeug erstellt nur eine vereinfachte mathematische
+        Driftberechnung auf Basis einer einzelnen Windprognose am
+        Startpunkt. Es ist keine Navigationssoftware, keine
+        Luftraumprüfung und keine Flugfreigabe. Vor jeder Ballonfahrt
+        sind aktuelle, autorisierte Wetterinformationen und alle
+        vorgeschriebenen Sicherheitsprüfungen erforderlich.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    <strong>Balloon Flight Planner</strong>
+
+    <span>
+      Kartendaten © OpenStreetMap-Mitwirkende |
+      Wetterdaten: Open-Meteo
+    </span>
+  </footer>
+
+  https://unpkg.com/leaflet@1.9.4/dist/leaflet.jsscript>
+  ./app.jsscript>
 </body>
 </html>
