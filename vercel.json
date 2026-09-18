@@ -1,14 +1,10 @@
 {
-  "version": 2,
-  "functions": {
-    "api/trajectory.js": {
-      "maxDuration": 60
-    }
-  },
+  "cleanUrls": true,
+  "trailingSlash": false,
   "headers": [
     {
       "source": "/(.*)",
-      "headers": [
+  *   "headers": [
         {
           "key": "X-Content-Type-Options",
           "value": "nosniff"
