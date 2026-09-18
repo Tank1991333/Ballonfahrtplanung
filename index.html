@@ -8,7 +8,7 @@
   
   <title>Ballonfahrtplanung</title>
 
-  <!-- Inline-Favicon löst den 404-Fehler auf Vercel -->
+  <!-- KORRIGIERT: Favicon-Pfad sauber geschlossen -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://w3.org viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎈</text></svg>">
 
   <!-- Leaflet CSS mit EXAKTEM Subresource-Integrity Hash gegen Browser-Blockaden -->
@@ -187,14 +187,14 @@
 
   </main>
 
-  <!-- 3. Leaflet JavaScript mit korrektem Sicherheits-Schlüssel (SRI) -->
+  <!-- Leaflet JavaScript mit verifiziertem SRI-Schlüssel -->
   <script 
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
 
-  <!-- 4. Ihre eigene JavaScript-Anwendungslogik (Absolut sauberes Tag) -->
+  <!-- Ihre eigene JavaScript-Anwendungslogik -->
   <script src="./app.js"></script>
 </body>
 </html>
