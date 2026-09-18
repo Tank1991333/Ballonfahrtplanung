@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <meta
+    name="description"
+    content="Kostenloser Ballonfahrt-Planer mit Startortsuche, Wetterdaten und vereinfachter Driftberechnung."
+  />
+
+  <title>Ballonfahrt-Planer</title>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIINfQ3ynhZJOZ3fMZKpLQmMZb9MZxQ+ass="header-content">
+      <div>
+        <p class="eyebrow">Balloon Flight Planner</p>
+1>
+
+        <p class="subtitle">
+          Startort auswählen, Wetterdaten laden und eine vereinfachte
+          Fahrtrichtung berechnen.
+        </p>
+      </div>
+
+      <div class="header-badge">
+        Kostenlose Privatversion
+      </div>
+    </div>
+  </header>
+
+  <main class="app-layout">
+    <aside class="sidebar">
+      <section class="card">
+        <h2>1. Startort auswählen</h2>
+
+        <label for="locationInput">
+          Ort, Adresse oder Postleitzahl
+        </label>
+
+        <div class="search-row">
+          <input
+            id="locationInput"
+            type="search"
+            value="Bad Waltersdorf"
+            placeholder="Zum Beispiel Bad Waltersdorf"
+            autocomplete="off"
+          />
+
+          <button id="searchButton" type="button">
+            Suchen
+          </button>
+        </div>
+
+        <div
+          id="searchResults"
+          class="search-results"
+          aria-live="polite"
+        ></div>
+
+        <p class="help-text">
+          Alternativ kannst du direkt auf die Karte klicken.
+        </p>
+
+        <div class="coordinates">
+          <div>
+            <span>Breitengrad</span>
+            <strong id="latitudeValue">47.16960</strong>
+          </div>
+
+          <div>
+            <span>Längengrad</span>
+            <strong id="longitudeValue">16.00930</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>2. Fahrtdaten einstellen</h2>
+
+        <div class="form-group">
+          <label for="flightDate">Datum</label>
+          <input id="flightDate" type="date" />
+        </div>
+
+        <div class="form-group">
+          <label for="flightTime">Startzeit</label>
+          <input id="flightTime" type="time" value="07:00" />
+        </div>
+
+        <div class="form-group">
+          <label for="flightDuration">
+            Flugdauer:
+            <strong>
+              <span id="durationValue">1.5</span> Stunden
+            </strong>
+          </label>
+
+          <input
+            id="flightDuration"
+            type="range"
+            min="0.5"
+            max="3"
+            step="0.25"
+            value="1.5"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="heightSelect">
+            Verwendete Windhöhe
+          </label>
+
+          <select id="heightSelect">
+            <option value="10">10 m über Grund</option>
+            <option value="80">80 m über Grund</option>
+            <option value="120">120 m über Grund</option>
+            <option value="180" selected>
+              180 m über Grund
+            </option>
+          </select>
+        </div>
+
+        <button
+          id="loadWeatherButton"
+          class="primary-button"
+          type="button"
+        >
+          Wetterdaten laden
+        </button>
+
+        <p id="statusMessage" class="status-message">
+          Startort auswählen und Wetterdaten laden.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>3. Wetterdaten</h2>
+
+        <div id="weatherEmpty" class="empty-state">
+          Noch keine Wetterdaten geladen.
+        </div>
+
+        <div id="weatherContent" class="hidden">
+          <div class="result-grid">
+            <div class="result-box">
+              <span>Prognosezeit</span>
+              <strong id="forecastTime">–</strong>
+            </div>
+
+            <div class="result-box">
+              <span>Temperatur</span>
+              <strong id="temperatureValue">–</strong>
+            </div>
+
+            <div class="result-box">
+              <span>Niederschlag</span>
+              <strong id="precipitationValue">–</strong>
+            </div>
+
+            <div class="result-box">
+              <span>Bewölkung</span>
+              <strong id="cloudCoverValue">–</strong>
+            </div>
+          </div>
+
+          <div class="wind-result">
+            <span>Gewählte Windhöhe</span>
+            <strong id="selectedHeightValue">–</strong>
+          </div>
+
+          <div class="wind-result">
+            <span>Windgeschwindigkeit</span>
+            <strong id="windSpeedValue">–</strong>
+          </div>
+
+          <div class="wind-result">
+            <span>Wind kommt aus</span>
+            <strong id="windFromValue">–</strong>
+          </div>
+
+          <div class="wind-result">
+            <span>Ballon bewegt sich ungefähr nach</span>
+            <strong id="travelDirectionValue">–</strong>
+          </div>
+
+          <div class="wind-result highlight">
+            <span>Vereinfachte Fahrstrecke</span>
+            <strong id="distanceValue">–</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Wind nach Höhe</h2>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Höhe</th>
+                <th>Wind</th>
+                <th>Aus</th>
+                <th>Fahrt nach</th>
+              </tr>
+            </thead>
+
+            <tbody id="windTableBody">
+              <tr>
+                <td colspan="4">
+                  Noch keine Daten
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </aside>
+
+    <section class="map-section">
+      <div id="map"></div>
+
+      <div class="map-info">
+        <strong id="selectedLocationName">
+          Bad Waltersdorf
+        </strong>
+
+        <span>
+          Blauer Marker: Startpunkt
+        </span>
+
+        <span>
+          Farbige Linien: vereinfachte Routen nach Höhe
+        </span>
+      </div>
+
+      <div class="legend">
+        <div>
+          <span class="legend-color height-10"></span>
+          10 m
+        </div>
+
+        <div>
+          <span class="legend-color height-80"></span>
+          80 m
+        </div>
+
+        <div>
+          <span class="legend-color height-120"></span>
+          120 m
+        </div>
+
+        <div>
+          <span class="legend-color height-180"></span>
+          180 m
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <section class="disclaimer">
+    <h2>Wichtiger Hinweis</h2>
+
+    <p>
+      Dieses Werkzeug erstellt nur eine vereinfachte mathematische
+      Driftberechnung auf Basis einer einzelnen Windprognose am Startpunkt.
+      Es ist keine Navigationssoftware, keine Luftraumprüfung und keine
+      Flugfreigabe. Vor jeder Ballonfahrt sind aktuelle, autorisierte
+      Wetterinformationen und alle vorgeschriebenen Sicherheitsprüfungen
+      erforderlich.
+    </p>
+  </section>
+
+  <footer>
+    <p>
+      Kartendaten © OpenStreetMap-Mitwirkende |
+      Wetterdaten: Open-Meteo
+    </p>
+  </footer>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+k
