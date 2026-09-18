@@ -1,0 +1,13 @@
+{
+  "name": "windy-ballonfahrtplanung",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Ballonfahrtplanung mit Windy Point Forecast API und Leaflet",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
