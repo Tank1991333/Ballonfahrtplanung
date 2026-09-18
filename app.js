@@ -1,342 +1,62 @@
 "use strict";
 
-const heightDefinitions = [
-  { height: 10, model: "icon_d2", sourceLabel: "ICON-D2" },
-  { height: 80, model: "icon_d2", sourceLabel: "ICON-D2" },
-  { height: 120, model: "icon_d2", sourceLabel: "ICON-D2" },
-  { height: 180, model: "icon_d2", sourceLabel: "ICON-D2" },
-  { height: 300, model: "gfs_seamless", sourceLabel: "GFS (925 hPa)", level: "925hPa" },
-  { height: 500, model: "gfs_seamless", sourceLabel: "GFS (925 hPa)", level: "925hPa" },
-  { height: 800, model: "gfs_seamless", sourceLabel: "GFS (850 hPa)", level: "850hPa" },
-  { height: 1000, model: "gfs_seamless", sourceLabel: "GFS (850 hPa)", level: "850hPa" },
-  { height: 1500, model: "gfs_seamless", sourceLabel: "GFS (850 hPa)", level: "850hPa" },
-  { height: 2000, model: "gfs_seamless", sourceLabel: "GFS (700 hPa)", level: "700hPa" },
-  { height: 3000, model: "gfs_seamless", sourceLabel: "GFS (500 hPa)", level: "500hPa" }
-];
-const heights = heightDefinitions.map((entry) => entry.height);
-const selectedDefaults = [10, 80, 120, 180];
+const definitions = [
+  [10, "icon_d2", "ICON-D2"], [80, "icon_d2", "ICON-D2"], [120, "icon_d2", "ICON-D2"], [180, "icon_d2", "ICON-D2"],
+  [300, "gfs_seamless", "GFS (925 hPa)", "925hPa"], [500, "gfs_seamless", "GFS (925 hPa)", "925hPa"],
+  [800, "gfs_seamless", "GFS (850 hPa)", "850hPa"], [1000, "gfs_seamless", "GFS (850 hPa)", "850hPa"],
+  [1500, "gfs_seamless", "GFS (850 hPa)", "850hPa"], [2000, "gfs_seamless", "GFS (700 hPa)", "700hPa"], [3000, "gfs_seamless", "GFS (500 hPa)", "500hPa"]
+].map(([height, model, sourceLabel, level]) => ({ height, model, sourceLabel, level }));
+const heights = definitions.map((d) => d.height);
+const byHeight = new Map(definitions.map((d) => [d.height, d]));
+const defaults = [10, 80, 120, 180];
 const colors = ["#1570a6", "#0b8b57", "#ea7d24", "#8b5cf6", "#dc2626", "#0891b2", "#ca8a04", "#db2777", "#4f46e5", "#059669", "#d97706"];
-const heightByValue = new Map(heightDefinitions.map((entry) => [entry.height, entry]));
-
 const $ = (id) => document.getElementById(id);
-const latInput = $("lat");
-const lonInput = $("lon");
-const displayLat = $("display-lat");
-const displayLon = $("display-lon");
-const currentLocationName = $("current-location-name");
-const durationRange = $("duration");
-const durationValue = $("duration-val");
-const dateInput = $("date");
-const startInput = $("start");
-const searchInput = $("search-location");
-const searchButton = $("search-button");
-const runButton = $("run");
-const statusMessage = $("status");
-const resultsContainer = $("results");
-const selectedCount = $("selected-count");
-const levelsContainer = $("levels");
-const mapStatusText = $("map-status-text");
-const emptyResultsHtml = resultsContainer.innerHTML;
-let simulationRequestId = 0;
+const latInput = $("lat"), lonInput = $("lon"), displayZone = $("display-zone"), displayEasting = $("display-easting"), displayNorthing = $("display-northing");
+const locationName = $("current-location-name"), duration = $("duration"), durationValue = $("duration-val"), dateInput = $("date"), startInput = $("start"), searchInput = $("search-location"), searchButton = $("search-button"), runButton = $("run"), status = $("status"), results = $("results"), count = $("selected-count"), levels = $("levels"), emptyResults = results.innerHTML;
+let layers = [], requestId = 0;
 
-if (typeof L === "undefined") {
-  $("map").innerHTML = '<div class="map-fallback">Die Karte konnte nicht geladen werden.</div>';
-  if (statusMessage) {
-    statusMessage.className = "status-message error";
-    statusMessage.textContent = "Leaflet wurde nicht geladen.";
-  }
-  throw new Error("Leaflet wurde nicht geladen.");
-}
-
-const startLatitude = Number.parseFloat(latInput.value) || 47.1696;
-const startLongitude = Number.parseFloat(lonInput.value) || 16.0093;
-const map = L.map("map").setView([startLatitude, startLongitude], 12);
+if (typeof L === "undefined") throw new Error("Leaflet wurde nicht geladen.");
+const lat0 = Number(latInput.value) || 47.1696, lon0 = Number(lonInput.value) || 16.0093;
+const map = L.map("map").setView([lat0, lon0], 12);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap" }).addTo(map);
-const startMarker = L.marker([startLatitude, startLongitude], { draggable: true }).addTo(map);
-startMarker.bindPopup("<b>Startplatz</b><br>Marker verschieben oder auf die Karte klicken.").openPopup();
-let simulationLayers = [];
-if (mapStatusText) mapStatusText.textContent = "Karte geladen";
+const marker = L.marker([lat0, lon0], { draggable: true }).addTo(map);
+marker.bindPopup("<b>Startplatz</b><br>Marker verschieben oder auf die Karte klicken.").openPopup();
 
-function setStatus(message, type) {
-  statusMessage.textContent = message;
-  statusMessage.className = `status-message ${type}`;
+function escapeHtml(value) { return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
+function formatAltitude(value) { return `${new Intl.NumberFormat("de-DE").format(value)} m`; }
+function formatSpeed(value) { return `${Math.max(0, Number(value) || 0).toFixed(1).replace(".", ",")} km/h`; }
+function formatDirection(value) { const degrees = ((Number(value) || 0) % 360 + 360) % 360; return `${Math.round(degrees)}° (${["N", "NO", "O", "SO", "S", "SW", "W", "NW"][Math.round(degrees / 45) % 8]})`; }
+function setStatus(message, type) { status.textContent = message; status.className = `status-message ${type}`; }
+function updateUtm(latitude, longitude) {
+  const zone = Math.floor((longitude + 180) / 6) + 1;
+  const centralMeridian = (zone - 1) * 6 - 177;
+  const a = 6378137, eccentricitySquared = 0.00669438, k0 = 0.9996;
+  const lat = latitude * Math.PI / 180, lon = longitude * Math.PI / 180, central = centralMeridian * Math.PI / 180;
+  const ep2 = eccentricitySquared / (1 - eccentricitySquared), n = a / Math.sqrt(1 - eccentricitySquared * Math.sin(lat) ** 2), t = Math.tan(lat) ** 2, c = ep2 * Math.cos(lat) ** 2, aa = Math.cos(lat) * (lon - central);
+  const m = a * ((1 - eccentricitySquared / 4 - 3 * eccentricitySquared ** 2 / 64 - 5 * eccentricitySquared ** 3 / 256) * lat - (3 * eccentricitySquared / 8 + 3 * eccentricitySquared ** 2 / 32 + 45 * eccentricitySquared ** 3 / 1024) * Math.sin(2 * lat) + (15 * eccentricitySquared ** 2 / 256 + 45 * eccentricitySquared ** 3 / 1024) * Math.sin(4 * lat) - (35 * eccentricitySquared ** 3 / 3072) * Math.sin(6 * lat));
+  const easting = k0 * n * (aa + (1 - t + c) * aa ** 3 / 6 + (5 - 18 * t + t ** 2 + 72 * c - 58 * ep2) * aa ** 5 / 120) + 500000;
+  const northing = k0 * (m + n * Math.tan(lat) * (aa ** 2 / 2 + (5 - t + 9 * c + 4 * c ** 2) * aa ** 4 / 24 + (61 - 58 * t + t ** 2 + 600 * c - 330 * ep2) * aa ** 6 / 720));
+  displayZone.textContent = `${zone}${latitude < 0 ? "S" : "N"}`; displayEasting.textContent = `${Math.round(easting)} m`; displayNorthing.textContent = `${Math.round(northing)} m`;
 }
+function updateLocation(latitude, longitude, name) { latInput.value = latitude.toFixed(5); lonInput.value = longitude.toFixed(5); updateUtm(latitude, longitude); if (name) { locationName.textContent = name; marker.setPopupContent(`<b>Startplatz</b><br>${escapeHtml(name)}`); } }
+function clearLayers() { layers.forEach((layer) => map.removeLayer(layer)); layers = []; }
+function resetResults(message) { requestId += 1; clearLayers(); results.innerHTML = emptyResults; setStatus(message, "info"); }
+function selectHeights(values) { levels.querySelectorAll("input").forEach((input) => { input.checked = values.includes(Number(input.value)); }); updateCount(); }
+function updateCount() { count.textContent = String(levels.querySelectorAll("input:checked").length); }
+function distance(a, b) { const r = 6371, dLat = (b[0] - a[0]) * Math.PI / 180, dLon = (b[1] - a[1]) * Math.PI / 180, x = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.sin(dLon / 2) ** 2; return r * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)); }
+function move(position, speed, direction, seconds) { const d = Math.max(0, speed) / 3.6 * seconds, angle = (direction + 180) * Math.PI / 180; return [position[0] + d * Math.cos(angle) / 111320, position[1] + d * Math.sin(angle) / (111320 * Math.max(.01, Math.cos(position[0] * Math.PI / 180)))]; }
+function valueAt(data, variable, timestamp) { const times = (data.hourly?.time || []).map((time) => Date.parse(`${time}Z`)), values = data.hourly?.[variable] || []; if (!times.length || !values.length) return 0; let i = times.findIndex((time) => time >= timestamp); if (i < 0) i = times.length - 1; if (!i) return Number(values[0]) || 0; const ratio = (timestamp - times[i - 1]) / (times[i] - times[i - 1]); return (Number(values[i - 1]) || 0) + ((Number(values[i]) || 0) - (Number(values[i - 1]) || 0)) * ratio; }
+function localTimestamp(date, time) { const [y, m, d] = date.split("-").map(Number), [h, min] = time.split(":").map(Number); return new Date(y, m - 1, d, h, min).getTime(); }
+function variable(definition, type) { return definition.model === "icon_d2" ? `${type}_${definition.height}m` : `${type}_${definition.level}`; }
+async function load(model, lat, lon, variables) { const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${[...new Set(variables)].join(",")}&models=${model}&forecast_days=2&timezone=UTC`; const response = await fetch(url); if (!response.ok) throw new Error(`Wetterdaten (${model}) konnten nicht geladen werden (${response.status}).`); return response.json(); }
+async function forecasts(lat, lon, selected) { const groups = new Map(); selected.forEach((height) => { const d = byHeight.get(height); if (!groups.has(d.model)) groups.set(d.model, []); groups.get(d.model).push(variable(d, "wind_speed"), variable(d, "wind_direction")); }); const map = new Map(); await Promise.all([...groups].map(async ([model, vars]) => map.set(model, await load(model, lat, lon, vars)))); return map; }
+function build(definition, forecast, lat, lon, start, hours) { let position = [lat, lon]; const points = [position], seconds = 900, steps = Math.ceil(hours * 3600 / seconds); for (let step = 1; step <= steps; step += 1) { const timestamp = start + step * seconds * 1000; position = move(position, valueAt(forecast, variable(definition, "wind_speed"), timestamp), valueAt(forecast, variable(definition, "wind_direction"), timestamp), seconds); points.push(position); } return points; }
 
-function escapeHtml(value) {
-  return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
-}
+async function runSimulation() { const lat = Number(latInput.value), lon = Number(lonInput.value), hours = Number(duration.value), selected = [...levels.querySelectorAll("input:checked")].map((input) => Number(input.value)), currentRequest = ++requestId; if (!Number.isFinite(lat) || !Number.isFinite(lon)) return setStatus("Die Startkoordinaten sind ungültig.", "error"); if (!selected.length) return setStatus("Bitte mindestens eine Höhe auswählen.", "error"); const start = localTimestamp(dateInput.value, startInput.value || "07:00"); if (!Number.isFinite(start)) return setStatus("Datum oder Startzeit ist ungültig.", "error"); clearLayers(); runButton.disabled = true; runButton.textContent = "Wetterdaten werden geladen..."; setStatus("Winddaten werden geladen...", "loading"); try { const data = await forecasts(lat, lon, selected); if (currentRequest !== requestId) return; const all = []; let rows = ""; selected.forEach((height, index) => { const definition = byHeight.get(height), forecast = data.get(definition.model), points = build(definition, forecast, lat, lon, start, hours), end = points.at(-1), endTime = start + (points.length - 1) * 900000, speed = valueAt(forecast, variable(definition, "wind_speed"), endTime), direction = valueAt(forecast, variable(definition, "wind_direction"), endTime), color = colors[index % colors.length]; const line = L.polyline(points, { color, weight: 4, opacity: .82, bubblingMouseEvents: false }).addTo(map).bindPopup(`<b>Windroute</b><br>${formatAltitude(height)}<br>${definition.sourceLabel}`), endMarker = L.circleMarker(end, { radius: 7, fillColor: color, color: "#fff", weight: 2, fillOpacity: 1, bubblingMouseEvents: false }).addTo(map); layers.push(line, endMarker); all.push(...points); rows += `<tr><td><span class="result-color" style="background:${color}"></span>${formatAltitude(height)}</td><td>${definition.sourceLabel}</td><td>${formatDirection(direction)}</td><td>${formatSpeed(speed)}</td><td>${distance([lat, lon], end).toFixed(2)} km</td></tr>`; }); results.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Höhe</th><th>Modell</th><th>Windrichtung</th><th>Windgeschwindigkeit</th><th>Entfernung</th></tr></thead><tbody>${rows}</tbody></table></div>`; const bounds = L.latLngBounds(all); if (bounds.isValid()) map.fitBounds(bounds.pad(.12), { maxZoom: 13 }); setStatus(`${selected.length} Trajektorien wurden berechnet.`, "success"); } catch (error) { if (currentRequest === requestId) { clearLayers(); results.innerHTML = emptyResults; setStatus(error.message || "Berechnung fehlgeschlagen.", "error"); } } finally { if (currentRequest === requestId) { runButton.disabled = false; runButton.textContent = "Simulation ausführen"; } } }
 
-function formatAltitude(value) {
-  return `${new Intl.NumberFormat("de-DE").format(value)} m`;
-}
+function searchLocation() { const query = searchInput.value.trim(); if (!query) return setStatus("Bitte einen Ort oder eine Postleitzahl eingeben.", "error"); searchButton.disabled = true; fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=at&accept-language=de&q=${encodeURIComponent(query)}`, { headers: { Accept: "application/json" } }).then((response) => { if (!response.ok) throw new Error("Ortssuche fehlgeschlagen"); return response.json(); }).then((data) => { if (!data.length) throw new Error("Ort nicht gefunden"); const lat = Number(data[0].lat), lon = Number(data[0].lon); marker.setLatLng([lat, lon]); map.setView([lat, lon], 13); updateLocation(lat, lon, data[0].display_name || query); resetResults("Startort geändert. Bitte Simulation erneut ausführen."); }).catch((error) => setStatus(error.message, "error")).finally(() => { searchButton.disabled = false; }); }
 
-function formatWindSpeed(value) {
-  const speed = Math.max(0, Number(value) || 0);
-  return `${speed.toFixed(1).replace(".", ",")} km/h`;
-}
-
-function formatWindDirection(value) {
-  const degrees = ((Number(value) || 0) % 360 + 360) % 360;
-  const directions = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
-  return `${Math.round(degrees)}° (${directions[Math.round(degrees / 45) % 8]})`;
-}
-
-function updateCoordinates(latitude, longitude, locationName) {
-  latInput.value = latitude.toFixed(5);
-  lonInput.value = longitude.toFixed(5);
-  displayLat.textContent = latitude.toFixed(5);
-  displayLon.textContent = longitude.toFixed(5);
-  if (locationName) {
-    currentLocationName.textContent = locationName;
-    startMarker.setPopupContent(`<b>Startplatz</b><br>${escapeHtml(locationName)}`);
-  }
-}
-
-function clearSimulation() {
-  simulationLayers.forEach((layer) => map.removeLayer(layer));
-  simulationLayers = [];
-}
-
-function resetResults(message = "Bitte Simulation erneut ausführen.") {
-  simulationRequestId += 1;
-  clearSimulation();
-  resultsContainer.innerHTML = emptyResultsHtml;
-  setStatus(message, "info");
-}
-
-function addHeightControls() {
-  heights.forEach((height) => {
-    const label = document.createElement("label");
-    const checkbox = document.createElement("input");
-    const span = document.createElement("span");
-    checkbox.type = "checkbox";
-    checkbox.name = "altitude";
-    checkbox.value = String(height);
-    checkbox.checked = selectedDefaults.includes(height);
-    span.textContent = formatAltitude(height);
-    label.append(checkbox, span);
-    levelsContainer.append(label);
-  });
-  levelsContainer.querySelectorAll("input").forEach((checkbox) => checkbox.addEventListener("change", updateSelectedCount));
-  updateSelectedCount();
-}
-
-function updateSelectedCount() {
-  selectedCount.textContent = String(levelsContainer.querySelectorAll("input:checked").length);
-}
-
-function selectHeights(values) {
-  levelsContainer.querySelectorAll("input").forEach((checkbox) => {
-    checkbox.checked = values.includes(Number(checkbox.value));
-  });
-  updateSelectedCount();
-}
-
-function toRadians(value) {
-  return (value * Math.PI) / 180;
-}
-
-function calculateDistance(a, b) {
-  const radius = 6371;
-  const dLat = toRadians(b[0] - a[0]);
-  const dLon = toRadians(b[1] - a[1]);
-  const x = Math.sin(dLat / 2) ** 2 + Math.cos(toRadians(a[0])) * Math.cos(toRadians(b[0])) * Math.sin(dLon / 2) ** 2;
-  return radius * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
-}
-
-function movePosition(position, speedKmh, directionFrom, seconds) {
-  const distance = (Math.max(0, speedKmh) / 3.6) * seconds;
-  const direction = toRadians((directionFrom + 180) % 360);
-  return [position[0] + (distance * Math.cos(direction)) / 111320, position[1] + (distance * Math.sin(direction)) / (111320 * Math.max(0.01, Math.cos(toRadians(position[0]))))];
-}
-
-function readInterpolatedHourlyValue(data, variable, timestamp) {
-  const times = Array.isArray(data?.hourly?.time) ? data.hourly.time.map((time) => Date.parse(`${time}Z`)) : [];
-  const values = Array.isArray(data?.hourly?.[variable]) ? data.hourly[variable].map(Number) : [];
-  if (!times.length || !values.length) return 0;
-  if (timestamp <= times[0]) return Math.max(0, values[0] || 0);
-  if (timestamp >= times[times.length - 1]) return Math.max(0, values[values.length - 1] || 0);
-  const upperIndex = times.findIndex((time) => time >= timestamp);
-  const lowerIndex = upperIndex - 1;
-  const ratio = (timestamp - times[lowerIndex]) / (times[upperIndex] - times[lowerIndex]);
-  const lower = Number.isFinite(values[lowerIndex]) ? values[lowerIndex] : 0;
-  const upper = Number.isFinite(values[upperIndex]) ? values[upperIndex] : lower;
-  return Math.max(0, lower + (upper - lower) * ratio);
-}
-
-function getForecastVariableName(definition, type) {
-  return definition.model === "icon_d2" ? `${type}_${definition.height}m` : `${type}_${definition.level}`;
-}
-
-function localDateTimeToTimestamp(dateValue, timeValue) {
-  if (!dateValue || !timeValue) return NaN;
-  const [year, month, day] = dateValue.split("-").map(Number);
-  const [hours, minutes] = timeValue.split(":").map(Number);
-  const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
-  return Number.isNaN(localDate.getTime()) ? NaN : localDate.getTime();
-}
-
-async function loadForecastForModel(model, latitude, longitude, variables) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=${variables.join(",")}&models=${model}&forecast_days=2&timezone=UTC`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    let details = "";
-    try {
-      const body = await response.json();
-      details = body.reason ? `: ${body.reason}` : "";
-    } catch (_) {
-      // Statusnummer verwenden, falls die API keine JSON-Fehlermeldung liefert.
-    }
-    throw new Error(`Wetterdaten (${model}) konnten nicht geladen werden (${response.status})${details}.`);
-  }
-  const data = await response.json();
-  if (!data.hourly || !Array.isArray(data.hourly.time)) throw new Error(`Die ${model}-Antwort ist unvollständig.`);
-  return data;
-}
-
-async function loadWeatherForSelection(latitude, longitude, selectedHeights) {
-  const requirementsByModel = new Map();
-  selectedHeights.forEach((height) => {
-    const definition = heightByValue.get(height);
-    if (!definition) return;
-    if (!requirementsByModel.has(definition.model)) requirementsByModel.set(definition.model, []);
-    const variables = requirementsByModel.get(definition.model);
-    variables.push(getForecastVariableName(definition, "wind_speed"));
-    variables.push(getForecastVariableName(definition, "wind_direction"));
-  });
-
-  const forecastMap = new Map();
-  await Promise.all(Array.from(requirementsByModel.entries()).map(async ([model, variables]) => {
-    const forecast = await loadForecastForModel(model, latitude, longitude, [...new Set(variables)]);
-    forecastMap.set(model, forecast);
-  }));
-  return forecastMap;
-}
-
-async function searchLocation() {
-  const query = searchInput.value.trim();
-  if (!query) return setStatus("Bitte einen Ort oder eine Postleitzahl eingeben.", "error");
-  searchButton.disabled = true;
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=at&accept-language=de&q=${encodeURIComponent(query)}`;
-    const response = await fetch(url, { headers: { Accept: "application/json" } });
-    if (!response.ok) throw new Error("Ortssuche fehlgeschlagen");
-    const data = await response.json();
-    if (!data.length) throw new Error("Ort nicht gefunden");
-    const latitude = Number(data[0].lat);
-    const longitude = Number(data[0].lon);
-    startMarker.setLatLng([latitude, longitude]);
-    map.setView([latitude, longitude], 13);
-    updateCoordinates(latitude, longitude, data[0].display_name || query);
-    resetResults("Startort geändert. Bitte Simulation erneut ausführen.");
-  } catch (error) {
-    setStatus(error.message || "Ortssuche fehlgeschlagen.", "error");
-  } finally {
-    searchButton.disabled = false;
-  }
-}
-
-function buildTrajectory(latitude, longitude, startTimestamp, durationHours, forecast, definition) {
-  const points = [[latitude, longitude]];
-  const stepSeconds = 15 * 60;
-  const steps = Math.max(1, Math.ceil((durationHours * 3600) / stepSeconds));
-  let current = [latitude, longitude];
-  const speedName = getForecastVariableName(definition, "wind_speed");
-  const directionName = getForecastVariableName(definition, "wind_direction");
-
-  for (let step = 1; step <= steps; step += 1) {
-    const timestamp = startTimestamp + step * stepSeconds * 1000;
-    current = movePosition(current, readInterpolatedHourlyValue(forecast, speedName, timestamp), readInterpolatedHourlyValue(forecast, directionName, timestamp), stepSeconds);
-    points.push(current);
-  }
-  return points;
-}
-
-async function runSimulation() {
-  const latitude = Number(latInput.value);
-  const longitude = Number(lonInput.value);
-  const duration = Number(durationRange.value);
-  const selected = Array.from(levelsContainer.querySelectorAll("input:checked"), (checkbox) => Number(checkbox.value));
-  const requestId = ++simulationRequestId;
-
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return setStatus("Die Startkoordinaten sind ungültig.", "error");
-  if (!selected.length) return setStatus("Bitte mindestens eine Höhe auswählen.", "error");
-
-  clearSimulation();
-  runButton.disabled = true;
-  runButton.textContent = "Wetterdaten werden geladen...";
-  setStatus("Winddaten werden geladen...", "loading");
-
-  try {
-    const startTimestamp = localDateTimeToTimestamp(dateInput.value, startInput.value || "07:00");
-    if (!Number.isFinite(startTimestamp)) throw new Error("Datum oder Startzeit ist ungültig.");
-    const forecastMap = await loadWeatherForSelection(latitude, longitude, selected);
-    if (requestId !== simulationRequestId) return;
-
-    const allPoints = [];
-    let rows = "";
-    selected.forEach((height) => {
-      const definition = heightByValue.get(height);
-      const forecast = forecastMap.get(definition.model);
-      const points = buildTrajectory(latitude, longitude, startTimestamp, duration, forecast, definition);
-      const color = colors[heights.indexOf(height)] || colors[0];
-      const end = points[points.length - 1];
-      const endTimestamp = startTimestamp + (points.length - 1) * 15 * 60 * 1000;
-      const speed = readInterpolatedHourlyValue(forecast, getForecastVariableName(definition, "wind_speed"), endTimestamp);
-      const direction = readInterpolatedHourlyValue(forecast, getForecastVariableName(definition, "wind_direction"), endTimestamp);
-      const line = L.polyline(points, { color, weight: 4, opacity: 0.82, bubblingMouseEvents: false }).addTo(map).bindPopup(`<b>Windroute</b><br>${formatAltitude(height)}<br>${definition.sourceLabel}`);
-      const marker = L.circleMarker(end, { radius: 7, fillColor: color, color: "#fff", weight: 2, fillOpacity: 1, bubblingMouseEvents: false }).addTo(map);
-      simulationLayers.push(line, marker);
-      allPoints.push(...points);
-      rows += `<tr><td><span class="result-color" style="background:${color}"></span>${formatAltitude(height)}</td><td>${definition.sourceLabel}</td><td>${formatWindDirection(direction)}</td><td>${formatWindSpeed(speed)}</td><td>${calculateDistance([latitude, longitude], end).toFixed(2)} km</td></tr>`;
-    });
-
-    resultsContainer.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Höhe</th><th>Modell</th><th>Windrichtung</th><th>Windgeschwindigkeit</th><th>Entfernung</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-    const bounds = L.latLngBounds(allPoints);
-    if (bounds.isValid()) map.fitBounds(bounds.pad(0.12), { maxZoom: 13 });
-    setStatus(`${selected.length} Trajektorien wurden berechnet.`, "success");
-  } catch (error) {
-    if (requestId === simulationRequestId) {
-      clearSimulation();
-      resultsContainer.innerHTML = emptyResultsHtml;
-      setStatus(error.message || "Berechnung fehlgeschlagen.", "error");
-    }
-  } finally {
-    if (requestId === simulationRequestId) {
-      runButton.disabled = false;
-      runButton.textContent = "Simulation ausführen";
-    }
-  }
-}
-
-startMarker.on("dragend", () => {
-  const point = startMarker.getLatLng();
-  updateCoordinates(point.lat, point.lng, "Manuell gewählter Startpunkt");
-  resetResults("Startpunkt geändert. Bitte Simulation erneut ausführen.");
-});
-map.on("click", (event) => {
-  startMarker.setLatLng(event.latlng);
-  updateCoordinates(event.latlng.lat, event.latlng.lng, "Manuell gewählter Startpunkt");
-  resetResults("Startpunkt geändert. Bitte Simulation erneut ausführen.");
-});
-
-const now = new Date();
-dateInput.value = now.toISOString().slice(0, 10);
-durationRange.addEventListener("input", () => {
-  durationValue.textContent = `${Number(durationRange.value).toFixed(1).replace(".", ",")} Stunden`;
-});
-[dateInput, startInput].forEach((input) => input.addEventListener("change", () => resetResults("Datum oder Startzeit geändert. Bitte Simulation erneut ausführen.")));
-searchButton.addEventListener("click", searchLocation);
-searchInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    event.preventDefault();
-    searchLocation();
-  }
-});
-runButton.addEventListener("click", runSimulation);
-$("btn-all-levels").addEventListener("click", () => selectHeights(heights));
-$("btn-no-levels").addEventListener("click", () => selectHeights([]));
-$("btn-balloon-levels").addEventListener("click", () => selectHeights(selectedDefaults));
-addHeightControls();
-window.addEventListener("load", () => setTimeout(() => map.invalidateSize(), 150));
-setStatus("Bereit.", "success");
+function addControls() { heights.forEach((height) => { const label = document.createElement("label"), input = document.createElement("input"), span = document.createElement("span"); input.type = "checkbox"; input.name = "altitude"; input.value = height; input.checked = defaults.includes(height); span.textContent = formatAltitude(height); label.append(input, span); levels.append(label); }); levels.querySelectorAll("input").forEach((input) => input.addEventListener("change", updateCount)); updateCount(); }
+marker.on("dragend", () => { const point = marker.getLatLng(); updateLocation(point.lat, point.lng, "Manuell gewählter Startpunkt"); resetResults("Startpunkt geändert. Bitte Simulation erneut ausführen."); });
+map.on("click", (event) => { marker.setLatLng(event.latlng); updateLocation(event.latlng.lat, event.latlng.lng, "Manuell gewählter Startpunkt"); resetResults("Startpunkt geändert. Bitte Simulation erneut ausführen."); });
+const now = new Date(); dateInput.value = now.toISOString().slice(0, 10); updateUtm(lat0, lon0); duration.addEventListener("input", () => { durationValue.textContent = `${Number(duration.value).toFixed(1).replace(".", ",")} Stunden`; }); [dateInput, startInput].forEach((input) => input.addEventListener("change", () => resetResults("Datum oder Startzeit geändert. Bitte Simulation erneut ausführen."))); searchButton.addEventListener("click", searchLocation); searchInput.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); searchLocation(); } }); runButton.addEventListener("click", runSimulation); $("btn-all-levels").addEventListener("click", () => selectHeights(heights)); $("btn-no-levels").addEventListener("click", () => selectHeights([])); $("btn-balloon-levels").addEventListener("click", () => selectHeights(defaults)); addControls(); setStatus("Bereit.", "success");
