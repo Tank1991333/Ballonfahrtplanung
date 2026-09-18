@@ -1,701 +1,680 @@
-"use strict";
-
-/*
- * Windy Ballonfahrtplanung
- * Browser-Anwendung mit Leaflet-Karte
- */
-
-const DEFAULT_POSITION = {
-    lat: 47.281,
-    lon: 15.97
-};
-
-const LEVELS = [
-    {
-        value: "surface",
-        name: "Bodennah",
-        description: "Modelloberfläche"
-    },
-    {
-        value: "1000h",
-        name: "1000 hPa",
-        description: "ungefähr 0 bis 150 m"
-    },
-    {
-        value: "950h",
-        name: "950 hPa",
-        description: "ungefähr 500 m"
-    },
-    {
-        value: "925h",
-        name: "925 hPa",
-        description: "ungefähr 750 m"
-    },
-    {
-        value: "900h",
-        name: "900 hPa",
-        description: "ungefähr 1.000 m"
-    },
-    {
-        value: "850h",
-        name: "850 hPa",
-        description: "ungefähr 1.500 m"
-    },
-    {
-        value: "800h",
-        name: "800 hPa",
-        description: "ungefähr 2.000 m"
-    },
-    {
-        value: "700h",
-        name: "700 hPa",
-        description: "ungefähr 3.000 m"
-    },
-    {
-        value: "600h",
-        name: "600 hPa",
-        description: "ungefähr 4.200 m"
-    },
-    {
-        value: "500h",
-        name: "500 hPa",
-        description: "ungefähr 5.500 m"
-    }
-];
-
-const DEFAULT_SELECTED_LEVELS = [
-    "900h",
-    "850h",
-    "800h"
-];
-
-const COLORS = [
-    "#e53935",
-    "#1565c0",
-    "#2e7d32",
-    "#8e24aa",
-    "#ef6c00",
-    "#00838f"
-];
-
-const latInput = document.getElementById("lat");
-const lonInput = document.getElementById("lon");
-const startInput = document.getElementById("start");
-const durationInput = document.getElementById("duration");
-const modelInput = document.getElementById("model");
-const stepInput = document.getElementById("step");
-
-const levelsContainer = document.getElementById("levels");
-const runButton = document.getElementById("run");
-const updatePositionButton =
-    document.getElementById("update-position");
-
-const statusElement = document.getElementById("status");
-const resultsElement = document.getElementById("results");
-
-/*
- * Leaflet-Karte erstellen
- */
-const map = L.map("map", {
-    zoomControl: true
-}).setView(
-    [DEFAULT_POSITION.lat, DEFAULT_POSITION.lon],
-    9
-);
-
-/*
- * OpenStreetMap-Hintergrundkarte
- */
-L.tileLayer(
-    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    {
-        maxZoom: 19,
-        attribution:
-            "&copy; OpenStreetMap-Mitwirkende"
-    }
-).addTo(map);
-
-/*
- * Eigenes Startsymbol
- */
-const startIcon = L.divIcon({
-    className: "",
-    html: `
-        <div class="custom-start-marker">
-            <span>🎈</span>
-        </div>
-    `,
-    iconSize: [30, 30],
-    iconAnchor: [15, 30]
-});
-
-let startMarker = L.marker(
-    [DEFAULT_POSITION.lat, DEFAULT_POSITION.lon],
-    {
-        draggable: true,
-        icon: startIcon
-    }
-).addTo(map);
-
-startMarker
-    .bindPopup("<strong>Startplatz</strong>")
-    .openPopup();
-
-let trajectoryLayers = [];
-
-/*
- * Höhenoptionen erzeugen
- */
-function createHeightOptions() {
-    levelsContainer.innerHTML = "";
-
-    LEVELS.forEach((level) => {
-        const wrapper = document.createElement("div");
-        wrapper.className = "height-option";
-
-        const checkbox = document.createElement("input");
-
-        checkbox.type = "checkbox";
-        checkbox.id = `level-${level.value}`;
-        checkbox.value = level.value;
-        checkbox.checked =
-            DEFAULT_SELECTED_LEVELS.includes(level.value);
-
-        const label = document.createElement("label");
-        label.htmlFor = checkbox.id;
-
-        label.innerHTML = `
-            <span class="height-name">${level.name}</span>
-            <span class="height-description">
-                ${level.description}
-            </span>
-        `;
-
-        checkbox.addEventListener("change", () => {
-            const selected = getSelectedLevels();
-
-            if (selected.length > 6) {
-                checkbox.checked = false;
-
-                setStatus(
-                    "Du kannst maximal sechs Höhen gleichzeitig auswählen.",
-                    "error"
-                );
-            }
-        });
-
-        wrapper.appendChild(checkbox);
-        wrapper.appendChild(label);
-        levelsContainer.appendChild(wrapper);
-    });
+:root {
+  --background: #061321;
+  --panel: rgba(7, 28, 46, 0.94);
+  --panel-light: rgba(18, 48, 74, 0.74);
+  --border: rgba(145, 194, 230, 0.2);
+  --text: #f4f8fc;
+  --muted: #a7b8c9;
+  --blue: #169df5;
+  --green: #43d17c;
+  --orange: #ffad33;
+  --red: #ff5252;
+  --violet: #b25cff;
+  --yellow: #ffd166;
+  --shadow: 0 18px 55px rgba(0, 0, 0, 0.36);
 }
 
-/*
- * Standardstartzeit auf die nächste volle Stunde setzen
- */
-function setDefaultStartTime() {
-    const startDate = new Date();
-
-    startDate.setHours(startDate.getHours() + 1);
-    startDate.setMinutes(0);
-    startDate.setSeconds(0);
-    startDate.setMilliseconds(0);
-
-    const localDate = new Date(
-        startDate.getTime() -
-        startDate.getTimezoneOffset() * 60000
-    );
-
-    startInput.value =
-        localDate.toISOString().slice(0, 16);
+* {
+  box-sizing: border-box;
 }
 
-/*
- * Ausgewählte Höhen auslesen
- */
-function getSelectedLevels() {
-    return Array.from(
-        document.querySelectorAll(
-            "#levels input[type='checkbox'\]:checked"
-        )
-    ).map((checkbox) => checkbox.value);
+html {
+  min-height: 100%;
 }
 
-/*
- * Bezeichnung einer Druckhöhe
- */
-function getLevelLabel(levelValue) {
-    const level = LEVELS.find(
-        (entry) => entry.value === levelValue
-    );
-
-    if (!level) {
-        return levelValue;
-    }
-
-    return `${level.name}, ${level.description}`;
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(4, 15, 27, 0.18),
+      rgba(4, 15, 27, 0.86) 390px,
+      #061321 900px
+    ),
+    url("./balloon-bg.jpg") center top / cover fixed no-repeat,
+    #061321;
+  color: var(--text);
+  font-family: Inter, Arial, sans-serif;
 }
 
-/*
- * Statusmeldung setzen
- */
-function setStatus(message, type = "") {
-    statusElement.textContent = message;
-    statusElement.className = "status-box";
-
-    if (type) {
-        statusElement.classList.add(type);
-    }
+button,
+input {
+  font: inherit;
 }
 
-/*
- * Startkoordinaten aktualisieren
- */
-function updateStartPosition(lat, lon, centerMap = false) {
-    const latitude = Number(lat);
-    const longitude = Number(lon);
-
-    if (
-        !Number.isFinite(latitude) ||
-        latitude < -90 ||
-        latitude > 90
-    ) {
-        throw new Error("Der Breitengrad ist ungültig.");
-    }
-
-    if (
-        !Number.isFinite(longitude) ||
-        longitude < -180 ||
-        longitude > 180
-    ) {
-        throw new Error("Der Längengrad ist ungültig.");
-    }
-
-    latInput.value = latitude.toFixed(5);
-    lonInput.value = longitude.toFixed(5);
-
-    startMarker.setLatLng([latitude, longitude]);
-
-    if (centerMap) {
-        map.setView(
-            [latitude, longitude],
-            Math.max(map.getZoom(), 10)
-        );
-    }
+button {
+  cursor: pointer;
 }
 
-/*
- * Kartenklick als neuer Startplatz
- */
-map.on("click", (event) => {
-    updateStartPosition(
-        event.latlng.lat,
-        event.latlng.lng,
-        false
-    );
-
-    startMarker
-        .bindPopup(
-            `
-                <strong>Startplatz</strong><br>
-                ${event.latlng.lat.toFixed(5)},
-                ${event.latlng.lng.toFixed(5)}
-            `
-        )
-        .openPopup();
-});
-
-/*
- * Verschieben des Startmarkers
- */
-startMarker.on("dragend", (event) => {
-    const position =
-        event.target.getLatLng();
-
-    updateStartPosition(
-        position.lat,
-        position.lng,
-        false
-    );
-});
-
-/*
- * Karte auf Koordinaten zentrieren
- */
-updatePositionButton.addEventListener("click", () => {
-    try {
-        updateStartPosition(
-            latInput.value,
-            lonInput.value,
-            true
-        );
-
-        setStatus(
-            "Startplatz wurde aktualisiert.",
-            "success"
-        );
-    } catch (error) {
-        setStatus(error.message, "error");
-    }
-});
-
-/*
- * Frühere Trajektorien entfernen
- */
-function clearTrajectoryLayers() {
-    trajectoryLayers.forEach((layer) => {
-        map.removeLayer(layer);
-    });
-
-    trajectoryLayers = [];
+.hero {
+  position: relative;
+  min-height: 255px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  padding: 36px 25px 30px;
 }
 
-/*
- * Distanz zwischen zwei Koordinaten berechnen
- */
-function calculateDistanceKm(pointA, pointB) {
-    const toRadians = (degrees) =>
-        degrees * Math.PI / 180;
-
-    const earthRadiusKm = 6371;
-
-    const latitudeDifference = toRadians(
-        pointB.lat - pointA.lat
-    );
-
-    const longitudeDifference = toRadians(
-        pointB.lon - pointA.lon
-    );
-
-    const latitudeA = toRadians(pointA.lat);
-    const latitudeB = toRadians(pointB.lat);
-
-    const haversine =
-        Math.sin(latitudeDifference / 2) ** 2 +
-        Math.cos(latitudeA) *
-        Math.cos(latitudeB) *
-        Math.sin(longitudeDifference / 2) ** 2;
-
-    return (
-        2 *
-        earthRadiusKm *
-        Math.asin(Math.sqrt(haversine))
-    );
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(2, 14, 25, 0.94),
+    rgba(2, 14, 25, 0.43) 65%,
+    rgba(2, 14, 25, 0.15)
+  );
 }
 
-/*
- * Ergebnisse auf Karte darstellen
- */
-function showTrajectories(data) {
-    clearTrajectoryLayers();
-
-    resultsElement.innerHTML = "";
-
-    const allCoordinates = [];
-
-    data.trajectories.forEach(
-        (trajectory, index) => {
-            const color =
-                COLORS[index % COLORS.length];
-
-            const coordinates =
-                trajectory.points.map((point) => [
-                    point.lat,
-                    point.lon
-                ]);
-
-            allCoordinates.push(...coordinates);
-
-            const routeLine = L.polyline(
-                coordinates,
-                {
-                    color,
-                    weight: 4,
-                    opacity: 0.9,
-                    lineJoin: "round"
-                }
-            ).addTo(map);
-
-            routeLine.bindTooltip(
-                getLevelLabel(trajectory.level),
-                {
-                    sticky: true
-                }
-            );
-
-            const landing = trajectory.landing;
-
-            const landingMarker = L.circleMarker(
-                [landing.lat, landing.lon],
-                {
-                    radius: 9,
-                    color: "#ffffff",
-                    weight: 3,
-                    fillColor: color,
-                    fillOpacity: 1
-                }
-            ).addTo(map);
-
-            const startPoint =
-                trajectory.points[0];
-
-            const distance = calculateDistanceKm(
-                startPoint,
-                landing
-            );
-
-            const mapsLink =
-                `https://www.openstreetmap.org/` +
-                `?mlat=${landing.lat}` +
-                `&mlon=${landing.lon}` +
-                `#map=14/${landing.lat}/${landing.lon}`;
-
-            landingMarker.bindPopup(`
-                <strong>Möglicher Endpunkt</strong><br>
-                ${getLevelLabel(trajectory.level)}<br><br>
-
-                Koordinaten:<br>
-                ${landing.lat.toFixed(5)},
-                ${landing.lon.toFixed(5)}<br><br>
-
-                Entfernung vom Start:
-                ${distance.toFixed(1)} km<br><br>
-
-                <a
-                    href="${mapsLink}"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    Position in OpenStreetMap öffnen
-                </a>
-            `);
-
-            trajectoryLayers.push(
-                routeLine,
-                landingMarker
-            );
-
-            const card =
-                document.createElement("div");
-
-            card.className = "result-card";
-
-            card.innerHTML = `
-                <div class="result-title">
-                    <span
-                        class="result-color"
-                        style="background:${color}"
-                    ></span>
-
-                    ${getLevelLabel(trajectory.level)}
-                </div>
-
-                <div class="result-coordinate">
-                    Endpunkt:
-                    ${landing.lat.toFixed(5)},
-                    ${landing.lon.toFixed(5)}
-                </div>
-
-                <div>
-                    Entfernung vom Start:
-                    ${distance.toFixed(1)} km
-                </div>
-            `;
-
-            resultsElement.appendChild(card);
-        }
-    );
-
-    if (allCoordinates.length > 1) {
-        map.fitBounds(
-            L.latLngBounds(allCoordinates),
-            {
-                padding: [45, 45]
-            }
-        );
-    }
+.hero-content {
+  position: relative;
+  width: min(1750px, 100%);
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 30px;
 }
 
-/*
- * Eingaben prüfen
- */
-function validateInputs() {
-    const lat = Number(latInput.value);
-    const lon = Number(lonInput.value);
-    const durationHours =
-        Number(durationInput.value);
-
-    const stepMinutes =
-        Number(stepInput.value);
-
-    const selectedLevels =
-        getSelectedLevels();
-
-    if (
-        !Number.isFinite(lat) ||
-        lat < -90 ||
-        lat > 90
-    ) {
-        throw new Error(
-            "Bitte einen gültigen Breitengrad eingeben."
-        );
-    }
-
-    if (
-        !Number.isFinite(lon) ||
-        lon < -180 ||
-        lon > 180
-    ) {
-        throw new Error(
-            "Bitte einen gültigen Längengrad eingeben."
-        );
-    }
-
-    if (!startInput.value) {
-        throw new Error(
-            "Bitte eine Startzeit auswählen."
-        );
-    }
-
-    const startDate =
-        new Date(startInput.value);
-
-    if (
-        Number.isNaN(startDate.getTime())
-    ) {
-        throw new Error(
-            "Die eingegebene Startzeit ist ungültig."
-        );
-    }
-
-    if (
-        !Number.isFinite(durationHours) ||
-        durationHours < 0.5 ||
-        durationHours > 12
-    ) {
-        throw new Error(
-            "Die Flugdauer muss zwischen 0,5 und 12 Stunden liegen."
-        );
-    }
-
-    if (
-        selectedLevels.length < 1 ||
-        selectedLevels.length > 6
-    ) {
-        throw new Error(
-            "Bitte eine bis sechs Höhen auswählen."
-        );
-    }
-
-    return {
-        lat,
-        lon,
-        startTime: startDate.toISOString(),
-        durationHours,
-        model: modelInput.value,
-        levels: selectedLevels,
-        stepMinutes
-    };
+.brand {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
 }
 
-/*
- * Trajektorien vom Vercel-Backend abrufen
- */
-async function calculateTrajectories() {
-    try {
-        const requestData =
-            validateInputs();
-
-        runButton.disabled = true;
-        runButton.textContent =
-            "Trajektorien werden berechnet …";
-
-        setStatus(
-            "Winddaten werden von der Windy Point Forecast API abgerufen. Das kann einige Sekunden dauern.",
-            "loading"
-        );
-
-        clearTrajectoryLayers();
-
-        const response = await fetch(
-            "/api/trajectory",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type":
-                        "application/json"
-                },
-                body: JSON.stringify(
-                    requestData
-                )
-            }
-        );
-
-        let responseData;
-
-        try {
-            responseData =
-                await response.json();
-        } catch {
-            throw new Error(
-                "Der Server hat keine gültige JSON-Antwort geliefert."
-            );
-        }
-
-        if (!response.ok) {
-            throw new Error(
-                responseData.error ||
-                `Serverfehler ${response.status}`
-            );
-        }
-
-        if (
-            !Array.isArray(
-                responseData.trajectories
-            ) ||
-            responseData.trajectories.length === 0
-        ) {
-            throw new Error(
-                "Es wurden keine Trajektorien zurückgegeben."
-            );
-        }
-
-        showTrajectories(responseData);
-
-        setStatus(
-            responseData.notice ||
-            "Berechnung erfolgreich abgeschlossen.",
-            "success"
-        );
-    } catch (error) {
-        console.error(error);
-
-        setStatus(
-            `Fehler: ${error.message}`,
-            "error"
-        );
-    } finally {
-        runButton.disabled = false;
-        runButton.textContent =
-            "Trajektorien berechnen";
-    }
+.brand-icon {
+  width: 70px;
+  height: 70px;
+  display: grid;
+  flex: 0 0 70px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 2.3rem;
+  backdrop-filter: blur(12px);
 }
 
-runButton.addEventListener(
-    "click",
-    calculateTrajectories
-);
+.eyebrow,
+.section-title small,
+.map-message small {
+  display: block;
+  margin-bottom: 5px;
+  color: #60c4ff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
 
-/*
- * Anwendung initialisieren
- */
-createHeightOptions();
-setDefaultStartTime();
+h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 5vw, 4.5rem);
+  line-height: 1;
+}
 
-/*
- * Leaflet muss nach dem Layoutaufbau
- * die Kartengröße neu prüfen.
- */
-window.setTimeout(() => {
-    map.invalidateSize();
-}, 200);
+.hero-text {
+  max-width: 730px;
+  margin: 14px 0 0;
+  color: #e0ebf4;
+  line-height: 1.6;
+}
+
+.technology-badge {
+  border-radius: 999px;
+  background: rgba(250, 252, 255, 0.93);
+  color: #17456a;
+  padding: 11px 17px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.app-layout {
+  width: min(1750px, calc(100% - 28px));
+  margin: 18px auto;
+  display: grid;
+  grid-template-columns: 380px 480px minmax(500px, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.sidebar,
+.results-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(
+    145deg,
+    rgba(15, 43, 67, 0.96),
+    rgba(6, 24, 40, 0.94)
+  );
+  box-shadow: var(--shadow);
+  padding: 19px;
+  backdrop-filter: blur(18px);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 18px;
+}
+
+.section-title.compact {
+  margin-bottom: 10px;
+}
+
+.section-title h2 {
+  margin: 0;
+  font-size: 1.08rem;
+}
+
+.step {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  flex: 0 0 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #1ba3ff, #0675df);
+  font-weight: 900;
+}
+
+label {
+  display: block;
+  color: #e0ebf5;
+  font-size: 0.79rem;
+  font-weight: 650;
+}
+
+input[type="search"],
+input[type="date"],
+input[type="time"] {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  background: rgba(4, 19, 33, 0.72);
+  color: white;
+  padding: 10px 12px;
+}
+
+input[type="date"] {
+  color-scheme: dark;
+}
+
+input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(22, 157, 245, 0.15);
+}
+
+.search-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 7px;
+}
+
+button {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(21, 57, 85, 0.92);
+  color: white;
+  padding: 9px 12px;
+}
+
+button:hover {
+  border-color: var(--blue);
+  filter: brightness(1.12);
+}
+
+.search-row button,
+.primary-button {
+  border: 0;
+  background: linear-gradient(145deg, #1aa5ff, #0675dc);
+  font-weight: 800;
+}
+
+.search-results {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.search-result {
+  width: 100%;
+  text-align: left;
+}
+
+.search-result strong,
+.search-result span {
+  display: block;
+}
+
+.search-result span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.hint,
+.status-message,
+.level-explanation {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.location-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 12px;
+  background: rgba(3, 18, 31, 0.55);
+  padding: 13px;
+}
+
+.pin {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.coordinates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.coordinates b {
+  color: #5ec5ff;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-bottom: 18px;
+}
+
+.field-grid label {
+  margin-bottom: 7px;
+}
+
+.range-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.range-header strong {
+  color: #62c8ff;
+  font-size: 0.79rem;
+}
+
+input[type="range"] {
+  width: 100%;
+  margin-top: 10px;
+  accent-color: var(--blue);
+}
+
+.range-labels {
+  display: flex;
+  justify-content: space-between;
+  color: #8296aa;
+  font-size: 0.64rem;
+}
+
+.level-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 15px;
+}
+
+.level-group {
+  margin-top: 15px;
+}
+
+.level-group h3 {
+  margin: 0 0 9px;
+  font-size: 0.84rem;
+}
+
+.height-selector {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 7px;
+}
+
+.height-selector label {
+  position: relative;
+}
+
+.height-selector input {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.height-selector span {
+  display: grid;
+  min-height: 38px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(3, 18, 31, 0.56);
+  color: var(--muted);
+  font-size: 0.72rem;
+  transition: 150ms ease;
+  cursor: pointer;
+}
+
+.height-selector input:checked + span {
+  border-color: #28aaff;
+  background: rgba(22, 157, 245, 0.2);
+  color: white;
+  box-shadow: 0 0 0 2px rgba(22, 157, 245, 0.1);
+}
+
+.pressure-selector input:checked + span {
+  border-color: #b25cff;
+  background: rgba(178, 92, 255, 0.18);
+}
+
+.primary-button {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 18px;
+}
+
+.status-message.success {
+  color: #61e7a1;
+}
+
+.status-message.error {
+  color: #ff929e;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 17px;
+  color: var(--muted);
+}
+
+.empty-state > span {
+  font-size: 2rem;
+}
+
+.empty-state p {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.weather-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.weather-grid div {
+  border-radius: 10px;
+  background: rgba(3, 18, 31, 0.52);
+  padding: 11px;
+}
+
+.weather-grid span,
+.weather-grid strong {
+  display: block;
+}
+
+.weather-grid span {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.weather-grid strong {
+  margin-top: 4px;
+  font-size: 0.82rem;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 5px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  color: var(--muted);
+}
+
+.no-data {
+  padding: 25px 5px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.map-panel {
+  position: sticky;
+  top: 14px;
+  height: calc(100vh - 28px);
+  min-height: 760px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+  min-height: 760px;
+}
+
+.map-message,
+.map-legend {
+  position: absolute;
+  z-index: 500;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(5, 23, 39, 0.93);
+  color: white;
+  padding: 11px 13px;
+  backdrop-filter: blur(12px);
+}
+
+.map-message {
+  top: 14px;
+  left: 58px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.map-message span {
+  font-size: 1.4rem;
+}
+
+.map-message strong {
+  display: block;
+  font-size: 0.76rem;
+}
+
+.map-legend {
+  top: 14px;
+  right: 14px;
+  min-width: 160px;
+}
+
+.map-legend h3 {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+}
+
+.map-legend p {
+  margin: 5px 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 7px 0;
+  font-size: 0.7rem;
+}
+
+.legend-line {
+  width: 27px;
+  border-top: 4px solid;
+}
+
+.warning {
+  width: min(1750px, calc(100% - 28px));
+  margin: 0 auto 20px;
+  display: flex;
+  gap: 15px;
+  border: 1px solid rgba(255, 209, 102, 0.32);
+  border-radius: 16px;
+  background: rgba(61, 42, 17, 0.72);
+  padding: 19px;
+}
+
+.warning-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  flex: 0 0 40px;
+  place-items: center;
+  border: 2px solid var(--yellow);
+  border-radius: 50%;
+  color: var(--yellow);
+  font-weight: 900;
+}
+
+.warning h2 {
+  margin: 0 0 6px;
+  color: var(--yellow);
+  font-size: 1rem;
+}
+
+.warning p {
+  margin: 0;
+  color: #e8dfc3;
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+footer {
+  color: var(--muted);
+  padding: 14px 20px 30px;
+  text-align: center;
+  font-size: 0.72rem;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: #0b243a;
+  color: white;
+}
+
+@media (max-width: 1350px) {
+  .app-layout {
+    grid-template-columns: 390px 1fr;
+  }
+
+  .map-panel {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+
+@media (max-width: 900px) {
+  .hero-content {
+    display: block;
+  }
+
+  .technology-badge {
+    display: inline-block;
+    margin-top: 18px;
+  }
+
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .map-panel {
+    position: relative;
+    top: auto;
+    grid-column: auto;
+    grid-row: auto;
+    height: 70vh;
+    min-height: 580px;
+  }
+
+  #map {
+    min-height: 580px;
+  }
+}
+
+@media (max-width: 540px) {
+  .brand {
+    display: block;
+  }
+
+  .brand-icon {
+    margin-bottom: 14px;
+  }
+
+  .field-grid,
+  .weather-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .height-selector {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .search-row {
+    grid-template-columns: 1fr;
+  }
+
+  .map-message {
+    top: 62px;
+    left: 10px;
+    right: 10px;
+  }
+}
