@@ -37,6 +37,7 @@ const selectedCount = $("selected-count");
 const levelsContainer = $("levels");
 const mapStatusText = $("map-status-text");
 const emptyResultsHtml = resultsContainer.innerHTML;
+let simulationRequestId = 0;
 
 if (typeof L === "undefined") {
   $("map").innerHTML = '<div class="map-fallback">Die Karte konnte nicht geladen werden.</div>';
@@ -94,6 +95,13 @@ function updateCoordinates(latitude, longitude, locationName) {
 function clearSimulation() {
   simulationLayers.forEach((layer) => map.removeLayer(layer));
   simulationLayers = [];
+}
+
+function resetResults(message = "Bitte Simulation erneut ausführen.") {
+  simulationRequestId += 1;
+  clearSimulation();
+  resultsContainer.innerHTML = emptyResultsHtml;
+  setStatus(message, "info");
 }
 
 function addHeightControls() {
@@ -160,6 +168,14 @@ function getForecastVariableName(definition, type) {
   return definition.model === "icon_d2" ? `${type}_${definition.height}m` : `${type}_${definition.level}`;
 }
 
+function localDateTimeToTimestamp(dateValue, timeValue) {
+  if (!dateValue || !timeValue) return NaN;
+  const [year, month, day] = dateValue.split("-").map(Number);
+  const [hours, minutes] = timeValue.split(":").map(Number);
+  const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  return Number.isNaN(localDate.getTime()) ? NaN : localDate.getTime();
+}
+
 async function loadForecastForModel(model, latitude, longitude, variables) {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=${variables.join(",")}&models=${model}&forecast_days=2&timezone=UTC`;
   const response = await fetch(url);
@@ -169,7 +185,7 @@ async function loadForecastForModel(model, latitude, longitude, variables) {
       const body = await response.json();
       details = body.reason ? `: ${body.reason}` : "";
     } catch (_) {
-      // Die Statusnummer reicht aus, falls die API keine JSON-Fehlermeldung liefert.
+      // Statusnummer verwenden, falls die API keine JSON-Fehlermeldung liefert.
     }
     throw new Error(`Wetterdaten (${model}) konnten nicht geladen werden (${response.status})${details}.`);
   }
@@ -212,7 +228,7 @@ async function searchLocation() {
     startMarker.setLatLng([latitude, longitude]);
     map.setView([latitude, longitude], 13);
     updateCoordinates(latitude, longitude, data[0].display_name || query);
-    setStatus("Startort wurde aktualisiert.", "success");
+    resetResults("Startort geändert. Bitte Simulation erneut ausführen.");
   } catch (error) {
     setStatus(error.message || "Ortssuche fehlgeschlagen.", "error");
   } finally {
@@ -220,13 +236,14 @@ async function searchLocation() {
   }
 }
 
-function buildTrajectory(height, latitude, longitude, startTimestamp, durationHours, forecast, definition) {
+function buildTrajectory(latitude, longitude, startTimestamp, durationHours, forecast, definition) {
   const points = [[latitude, longitude]];
   const stepSeconds = 15 * 60;
   const steps = Math.max(1, Math.ceil((durationHours * 3600) / stepSeconds));
   let current = [latitude, longitude];
   const speedName = getForecastVariableName(definition, "wind_speed");
   const directionName = getForecastVariableName(definition, "wind_direction");
+
   for (let step = 1; step <= steps; step += 1) {
     const timestamp = startTimestamp + step * stepSeconds * 1000;
     current = movePosition(current, readInterpolatedHourlyValue(forecast, speedName, timestamp), readInterpolatedHourlyValue(forecast, directionName, timestamp), stepSeconds);
@@ -240,6 +257,8 @@ async function runSimulation() {
   const longitude = Number(lonInput.value);
   const duration = Number(durationRange.value);
   const selected = Array.from(levelsContainer.querySelectorAll("input:checked"), (checkbox) => Number(checkbox.value));
+  const requestId = ++simulationRequestId;
+
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return setStatus("Die Startkoordinaten sind ungültig.", "error");
   if (!selected.length) return setStatus("Bitte mindestens eine Höhe auswählen.", "error");
 
@@ -249,16 +268,17 @@ async function runSimulation() {
   setStatus("Winddaten werden geladen...", "loading");
 
   try {
-    const startTimestamp = Date.parse(`${dateInput.value}T${startInput.value || "07:00"}:00Z`);
+    const startTimestamp = localDateTimeToTimestamp(dateInput.value, startInput.value || "07:00");
     if (!Number.isFinite(startTimestamp)) throw new Error("Datum oder Startzeit ist ungültig.");
     const forecastMap = await loadWeatherForSelection(latitude, longitude, selected);
+    if (requestId !== simulationRequestId) return;
+
     const allPoints = [];
     let rows = "";
-
     selected.forEach((height) => {
       const definition = heightByValue.get(height);
       const forecast = forecastMap.get(definition.model);
-      const points = buildTrajectory(height, latitude, longitude, startTimestamp, duration, forecast, definition);
+      const points = buildTrajectory(latitude, longitude, startTimestamp, duration, forecast, definition);
       const color = colors[heights.indexOf(height)] || colors[0];
       const end = points[points.length - 1];
       const endTimestamp = startTimestamp + (points.length - 1) * 15 * 60 * 1000;
@@ -276,22 +296,28 @@ async function runSimulation() {
     if (bounds.isValid()) map.fitBounds(bounds.pad(0.12), { maxZoom: 13 });
     setStatus(`${selected.length} Trajektorien wurden berechnet.`, "success");
   } catch (error) {
-    clearSimulation();
-    resultsContainer.innerHTML = emptyResultsHtml;
-    setStatus(error.message || "Berechnung fehlgeschlagen.", "error");
+    if (requestId === simulationRequestId) {
+      clearSimulation();
+      resultsContainer.innerHTML = emptyResultsHtml;
+      setStatus(error.message || "Berechnung fehlgeschlagen.", "error");
+    }
   } finally {
-    runButton.disabled = false;
-    runButton.textContent = "Simulation ausführen";
+    if (requestId === simulationRequestId) {
+      runButton.disabled = false;
+      runButton.textContent = "Simulation ausführen";
+    }
   }
 }
 
 startMarker.on("dragend", () => {
   const point = startMarker.getLatLng();
   updateCoordinates(point.lat, point.lng, "Manuell gewählter Startpunkt");
+  resetResults("Startpunkt geändert. Bitte Simulation erneut ausführen.");
 });
 map.on("click", (event) => {
   startMarker.setLatLng(event.latlng);
   updateCoordinates(event.latlng.lat, event.latlng.lng, "Manuell gewählter Startpunkt");
+  resetResults("Startpunkt geändert. Bitte Simulation erneut ausführen.");
 });
 
 const now = new Date();
@@ -299,6 +325,7 @@ dateInput.value = now.toISOString().slice(0, 10);
 durationRange.addEventListener("input", () => {
   durationValue.textContent = `${Number(durationRange.value).toFixed(1).replace(".", ",")} Stunden`;
 });
+[dateInput, startInput].forEach((input) => input.addEventListener("change", () => resetResults("Datum oder Startzeit geändert. Bitte Simulation erneut ausführen.")));
 searchButton.addEventListener("click", searchLocation);
 searchInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
