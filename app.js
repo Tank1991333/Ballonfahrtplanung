@@ -65,6 +65,17 @@ function formatAltitude(value) {
   return `${new Intl.NumberFormat("de-DE").format(value)} m`;
 }
 
+function formatWindSpeed(value) {
+  return `${Number(value).toFixed(1).replace(".", ",")} km/h`;
+}
+
+function formatWindDirection(value) {
+  const degrees = ((Number(value) % 360) + 360) % 360;
+  const directions = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
+  const cardinal = directions[Math.round(degrees / 45) % directions.length];
+  return `${Math.round(degrees)}° (${cardinal})`;
+}
+
 function updateCoordinates(latitude, longitude, locationName) {
   latInput.value = latitude.toFixed(5);
   lonInput.value = longitude.toFixed(5);
@@ -268,16 +279,19 @@ async function runSimulation() {
       const color = colors[heights.indexOf(height)] ?? colors[0];
       const line = L.polyline(points, { color, weight: 4, opacity: 0.82, bubblingMouseEvents: false }).addTo(map).bindPopup(`<b>ICON-D2-Route</b><br>${formatAltitude(height)}`);
       const end = points[points.length - 1];
+      const endTimestamp = startTimestamp + (Math.max(0, points.length - 1) * 15 * 60 * 1000);
+      const endSpeed = readInterpolatedHourlyValue(forecast, `wind_speed_${height}m`, endTimestamp);
+      const endDirection = readInterpolatedHourlyValue(forecast, `wind_direction_${height}m`, endTimestamp);
       const marker = L.circleMarker(end, { radius: 7, fillColor: color, color: "#fff", weight: 2, fillOpacity: 1, bubblingMouseEvents: false }).addTo(map);
 
       simulationLayers.push(line, marker);
       allPoints.push(...points);
 
-      const distance = calculateDistance([latitude, longitude], end) * 1.0;
-      rows += `<tr><td><span class="result-color" style="background:${color}"></span>${formatAltitude(height)}</td><td>${end[0].toFixed(5)}</td><td>${end[1].toFixed(5)}</td><td>${distance.toFixed(2)} km</td></tr>`;
+      const distance = calculateDistance([latitude, longitude], end);
+      rows += `<tr><td><span class="result-color" style="background:${color}"></span>${formatAltitude(height)}</td><td>${formatWindDirection(endDirection)}</td><td>${formatWindSpeed(endSpeed)}</td><td>${end[0].toFixed(5)}</td><td>${end[1].toFixed(5)}</td><td>${distance.toFixed(2)} km</td></tr>`;
     });
 
-    resultsContainer.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Höhe</th><th>Lat. Ende</th><th>Lon. Ende</th><th>Entfernung</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    resultsContainer.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Höhe</th><th>Windrichtung</th><th>Windgeschwindigkeit</th><th>Lat. Ende</th><th>Lon. Ende</th><th>Entfernung</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 
     const bounds = L.latLngBounds(allPoints);
     if (bounds.isValid()) {
